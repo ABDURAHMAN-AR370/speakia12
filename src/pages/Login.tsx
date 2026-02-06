@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { signIn } from "@/lib/auth";
+import { signIn, getUserRole } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2, BookOpen } from "lucide-react";
 
 export default function Login() {
@@ -22,11 +23,23 @@ export default function Login() {
     const result = await signIn(email, password);
 
     if (result.success) {
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
-      navigate("/dashboard");
+      // Check role to determine redirect
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const role = await getUserRole(user.id);
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        // Redirect based on role
+        if (role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+      } else {
+        navigate("/dashboard");
+      }
     } else {
       toast({
         title: "Login failed",

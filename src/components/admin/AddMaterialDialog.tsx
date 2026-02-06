@@ -31,10 +31,16 @@ interface Material {
   material_type: string;
   material_url: string | null;
   form_id: string | null;
+  quiz_id: string | null;
   order_index: number;
 }
 
 interface Form {
+  id: string;
+  name: string;
+}
+
+interface Quiz {
   id: string;
   name: string;
 }
@@ -55,6 +61,7 @@ export default function AddMaterialDialog({
   const { user } = useAuth();
   const { toast } = useToast();
   const [forms, setForms] = useState<Form[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
@@ -63,20 +70,22 @@ export default function AddMaterialDialog({
     details: editingMaterial?.details || "",
     material_type: editingMaterial?.material_type || "link",
     material_url: editingMaterial?.material_url || "",
-    form_id: editingMaterial?.form_id || "none",
+    form_id: editingMaterial?.form_id || "",
+    quiz_id: editingMaterial?.quiz_id || "",
     order_index: editingMaterial?.order_index?.toString() || "0",
   });
 
   useEffect(() => {
-    fetchForms();
+    fetchFormsAndQuizzes();
   }, []);
 
-  const fetchForms = async () => {
-    const { data } = await supabase
-      .from("custom_forms")
-      .select("id, name")
-      .order("name");
-    setForms(data || []);
+  const fetchFormsAndQuizzes = async () => {
+    const [formsResult, quizzesResult] = await Promise.all([
+      supabase.from("custom_forms").select("id, name").order("name"),
+      supabase.from("quizzes").select("id, name").order("name"),
+    ]);
+    setForms(formsResult.data || []);
+    setQuizzes(quizzesResult.data || []);
   };
 
   const handleChange = (field: string, value: string) => {
@@ -117,12 +126,40 @@ export default function AddMaterialDialog({
     }
   };
 
-  const handleSubmit = async () => {
+  const validateMaterial = (): string | null => {
     if (!formData.work_type.trim()) {
-      toast({
-        title: "Work type is required",
-        variant: "destructive",
-      });
+      return "Work type is required";
+    }
+
+    // Material attachment is mandatory based on type
+    switch (formData.material_type) {
+      case "form":
+        if (!formData.form_id) {
+          return "Please select a form";
+        }
+        break;
+      case "quiz":
+        if (!formData.quiz_id) {
+          return "Please select a quiz";
+        }
+        break;
+      case "image":
+      case "video":
+      case "audio":
+      case "link":
+        if (!formData.material_url.trim()) {
+          return "Please provide a URL or upload a file";
+        }
+        break;
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    const error = validateMaterial();
+    if (error) {
+      toast({ title: error, variant: "destructive" });
       return;
     }
 
@@ -133,8 +170,9 @@ export default function AddMaterialDialog({
         work_type: formData.work_type,
         details: formData.details || null,
         material_type: formData.material_type,
-        material_url: formData.material_url || null,
-        form_id: formData.form_id === "none" ? null : formData.form_id,
+        material_url: ["form", "quiz"].includes(formData.material_type) ? null : formData.material_url || null,
+        form_id: formData.material_type === "form" ? formData.form_id : null,
+        quiz_id: formData.material_type === "quiz" ? formData.quiz_id : null,
         order_index: parseInt(formData.order_index),
         created_by: user?.id,
       };
@@ -165,6 +203,10 @@ export default function AddMaterialDialog({
       setLoading(false);
     }
   };
+
+  const showUrlField = ["image", "video", "audio", "link"].includes(formData.material_type);
+  const showFormSelect = formData.material_type === "form";
+  const showQuizSelect = formData.material_type === "quiz";
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -245,63 +287,101 @@ export default function AddMaterialDialog({
                 <SelectItem value="video">Video</SelectItem>
                 <SelectItem value="audio">Audio</SelectItem>
                 <SelectItem value="link">Link</SelectItem>
+                <SelectItem value="form">Form</SelectItem>
+                <SelectItem value="quiz">Quiz</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>
-              {formData.material_type === "link" ? "URL" : "Upload or URL"}
-            </Label>
-            {formData.material_type !== "link" && (
-              <div className="mb-2">
-                <Input
-                  type="file"
-                  accept={
-                    formData.material_type === "image"
-                      ? "image/*"
-                      : formData.material_type === "video"
-                      ? "video/*"
-                      : formData.material_type === "audio"
-                      ? "audio/*"
-                      : "*"
-                  }
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-                {uploading && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Uploading...
-                  </p>
-                )}
-              </div>
-            )}
-            <Input
-              placeholder="https://..."
-              value={formData.material_url}
-              onChange={(e) => handleChange("material_url", e.target.value)}
-            />
-          </div>
+          {showUrlField && (
+            <div className="space-y-2">
+              <Label>
+                {formData.material_type === "link" ? "URL *" : "Upload or URL *"}
+              </Label>
+              {formData.material_type !== "link" && (
+                <div className="mb-2">
+                  <Input
+                    type="file"
+                    accept={
+                      formData.material_type === "image"
+                        ? "image/*"
+                        : formData.material_type === "video"
+                        ? "video/*"
+                        : formData.material_type === "audio"
+                        ? "audio/*"
+                        : "*"
+                    }
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                  />
+                  {uploading && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Uploading...
+                    </p>
+                  )}
+                </div>
+              )}
+              <Input
+                placeholder="https://..."
+                value={formData.material_url}
+                onChange={(e) => handleChange("material_url", e.target.value)}
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label>Completion Form (Optional)</Label>
-            <Select
-              value={formData.form_id}
-              onValueChange={(v) => handleChange("form_id", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="No form required" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No form required</SelectItem>
-                {forms.map((form) => (
-                  <SelectItem key={form.id} value={form.id}>
-                    {form.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {showFormSelect && (
+            <div className="space-y-2">
+              <Label>Select Form *</Label>
+              <Select
+                value={formData.form_id}
+                onValueChange={(v) => handleChange("form_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a form" />
+                </SelectTrigger>
+                <SelectContent>
+                  {forms.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No forms available - create one first
+                    </SelectItem>
+                  ) : (
+                    forms.map((form) => (
+                      <SelectItem key={form.id} value={form.id}>
+                        {form.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {showQuizSelect && (
+            <div className="space-y-2">
+              <Label>Select Quiz *</Label>
+              <Select
+                value={formData.quiz_id}
+                onValueChange={(v) => handleChange("quiz_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a quiz" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quizzes.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No quizzes available - create one first
+                    </SelectItem>
+                  ) : (
+                    quizzes.map((quiz) => (
+                      <SelectItem key={quiz.id} value={quiz.id}>
+                        {quiz.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
