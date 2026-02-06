@@ -25,6 +25,7 @@ export type Database = {
           material_type: string
           material_url: string | null
           order_index: number
+          quiz_id: string | null
           updated_at: string
           work_type: string
         }
@@ -38,6 +39,7 @@ export type Database = {
           material_type: string
           material_url?: string | null
           order_index?: number
+          quiz_id?: string | null
           updated_at?: string
           work_type: string
         }
@@ -51,6 +53,7 @@ export type Database = {
           material_type?: string
           material_url?: string | null
           order_index?: number
+          quiz_id?: string | null
           updated_at?: string
           work_type?: string
         }
@@ -60,6 +63,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "custom_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_materials_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
             referencedColumns: ["id"]
           },
         ]
@@ -138,6 +148,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          batch_number: number
           created_at: string
           email: string
           full_name: string
@@ -149,6 +160,7 @@ export type Database = {
           whatsapp_number: string
         }
         Insert: {
+          batch_number?: number
           created_at?: string
           email: string
           full_name: string
@@ -160,6 +172,7 @@ export type Database = {
           whatsapp_number: string
         }
         Update: {
+          batch_number?: number
           created_at?: string
           email?: string
           full_name?: string
@@ -169,6 +182,87 @@ export type Database = {
           updated_at?: string
           user_id?: string
           whatsapp_number?: string
+        }
+        Relationships: []
+      }
+      quiz_submissions: {
+        Row: {
+          answers: Json
+          id: string
+          material_id: string
+          max_score: number
+          quiz_id: string
+          score: number
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          id?: string
+          material_id: string
+          max_score?: number
+          quiz_id: string
+          score?: number
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          id?: string
+          material_id?: string
+          max_score?: number
+          quiz_id?: string
+          score?: number
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_submissions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "course_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_submissions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          points_per_question: number
+          questions: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          points_per_question?: number
+          questions?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          points_per_question?: number
+          questions?: Json
+          updated_at?: string
         }
         Relationships: []
       }
@@ -225,18 +319,21 @@ export type Database = {
       whitelist: {
         Row: {
           added_by: string | null
+          batch_number: number
           created_at: string
           email: string
           id: string
         }
         Insert: {
           added_by?: string | null
+          batch_number?: number
           created_at?: string
           email: string
           id?: string
         }
         Update: {
           added_by?: string | null
+          batch_number?: number
           created_at?: string
           email?: string
           id?: string

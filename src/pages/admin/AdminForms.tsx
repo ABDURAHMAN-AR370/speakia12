@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Edit, GripVertical, Loader2 } from "lucide-react";
+import { Plus, Trash2, Edit, GripVertical, Loader2, FileText, HelpCircle } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
+import QuizBuilder from "@/components/admin/QuizBuilder";
 
 interface FormField {
   id: string;
@@ -42,6 +44,24 @@ interface CustomForm {
   created_at: string;
 }
 
+interface QuizQuestion {
+  id: string;
+  type: "mcq" | "true_false" | "short_answer";
+  question: string;
+  options?: string[];
+  correctAnswer: string | string[];
+  points: number;
+}
+
+interface Quiz {
+  id: string;
+  name: string;
+  description: string | null;
+  questions: QuizQuestion[];
+  points_per_question: number;
+  created_at: string;
+}
+
 const FIELD_TYPES = [
   { value: "short_text", label: "Short Text" },
   { value: "long_text", label: "Long Text / Paragraph" },
@@ -56,42 +76,50 @@ export default function AdminForms() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [forms, setForms] = useState<CustomForm[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFormDialog, setShowFormDialog] = useState(false);
+  const [showQuizDialog, setShowQuizDialog] = useState(false);
   const [editingForm, setEditingForm] = useState<CustomForm | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [fields, setFields] = useState<FormField[]>([]);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("forms");
 
   useEffect(() => {
-    fetchForms();
+    fetchData();
   }, []);
 
-  const fetchForms = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("custom_forms")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const [formsResult, quizzesResult] = await Promise.all([
+        supabase.from("custom_forms").select("*").order("created_at", { ascending: false }),
+        supabase.from("quizzes").select("*").order("created_at", { ascending: false }),
+      ]);
 
       // Parse fields for each form
-      const parsedForms = (data || []).map((form) => ({
+      const parsedForms = (formsResult.data || []).map((form) => ({
         ...form,
         fields: typeof form.fields === "string" ? JSON.parse(form.fields) : form.fields,
       })) as CustomForm[];
 
+      const parsedQuizzes = (quizzesResult.data || []).map((quiz) => ({
+        ...quiz,
+        questions: typeof quiz.questions === "string" ? JSON.parse(quiz.questions) : quiz.questions,
+      })) as Quiz[];
+
       setForms(parsedForms);
+      setQuizzes(parsedQuizzes);
     } catch (error) {
-      console.error("Error fetching forms:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenDialog = (form?: CustomForm) => {
+  const handleOpenFormDialog = (form?: CustomForm) => {
     if (form) {
       setEditingForm(form);
       setFormName(form.name);
@@ -106,12 +134,22 @@ export default function AdminForms() {
     setShowFormDialog(true);
   };
 
-  const handleCloseDialog = () => {
+  const handleCloseFormDialog = () => {
     setShowFormDialog(false);
     setEditingForm(null);
     setFormName("");
     setFormDescription("");
     setFields([]);
+  };
+
+  const handleOpenQuizDialog = (quiz?: Quiz) => {
+    setEditingQuiz(quiz || null);
+    setShowQuizDialog(true);
+  };
+
+  const handleCloseQuizDialog = () => {
+    setShowQuizDialog(false);
+    setEditingQuiz(null);
   };
 
   const addField = () => {
@@ -135,7 +173,7 @@ export default function AdminForms() {
     setFields(fields.filter((f) => f.id !== id));
   };
 
-  const handleSave = async () => {
+  const handleSaveForm = async () => {
     if (!formName.trim()) {
       toast({ title: "Form name is required", variant: "destructive" });
       return;
@@ -174,8 +212,8 @@ export default function AdminForms() {
         toast({ title: "Form created" });
       }
 
-      handleCloseDialog();
-      fetchForms();
+      handleCloseFormDialog();
+      fetchData();
     } catch (error) {
       console.error("Save error:", error);
       toast({ title: "Failed to save form", variant: "destructive" });
@@ -184,14 +222,25 @@ export default function AdminForms() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteForm = async (id: string) => {
     try {
       const { error } = await supabase.from("custom_forms").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Form deleted" });
-      fetchForms();
+      fetchData();
     } catch (error) {
       toast({ title: "Failed to delete form", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteQuiz = async (id: string) => {
+    try {
+      const { error } = await supabase.from("quizzes").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Quiz deleted" });
+      fetchData();
+    } catch (error) {
+      toast({ title: "Failed to delete quiz", variant: "destructive" });
     }
   };
 
@@ -200,83 +249,165 @@ export default function AdminForms() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Form Builder</h1>
+            <h1 className="text-3xl font-bold text-foreground">Forms & Quizzes</h1>
             <p className="text-muted-foreground mt-1">
-              Create custom forms for course materials
+              Create custom forms and quizzes for course materials
             </p>
           </div>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Form
-          </Button>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : forms.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground mb-4">No forms created yet</p>
-              <Button onClick={() => handleOpenDialog()}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="forms" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Forms
+            </TabsTrigger>
+            <TabsTrigger value="quizzes" className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              Quizzes
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="forms" className="space-y-4">
+            <div className="flex justify-end">
+              <Button onClick={() => handleOpenFormDialog()}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Your First Form
+                Create Form
               </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {forms.map((form) => (
-              <Card key={form.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{form.name}</CardTitle>
-                      {form.description && (
-                        <CardDescription className="mt-1">
-                          {form.description}
-                        </CardDescription>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(form)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(form.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{form.fields.length} fields</Badge>
-                    {form.fields.slice(0, 3).map((field) => (
-                      <Badge key={field.id} variant="outline" className="text-xs">
-                        {field.label || "Unnamed"}
-                      </Badge>
-                    ))}
-                    {form.fields.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{form.fields.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">Loading...</div>
+            ) : forms.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground mb-4">No forms created yet</p>
+                  <Button onClick={() => handleOpenFormDialog()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Form
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {forms.map((form) => (
+                  <Card key={form.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{form.name}</CardTitle>
+                          {form.description && (
+                            <CardDescription className="mt-1">
+                              {form.description}
+                            </CardDescription>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenFormDialog(form)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteForm(form.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">{form.fields.length} fields</Badge>
+                        {form.fields.slice(0, 3).map((field) => (
+                          <Badge key={field.id} variant="outline" className="text-xs">
+                            {field.label || "Unnamed"}
+                          </Badge>
+                        ))}
+                        {form.fields.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{form.fields.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="quizzes" className="space-y-4">
+            <div className="flex justify-end">
+              <Button onClick={() => handleOpenQuizDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Quiz
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">Loading...</div>
+            ) : quizzes.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground mb-4">No quizzes created yet</p>
+                  <Button onClick={() => handleOpenQuizDialog()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Quiz
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {quizzes.map((quiz) => (
+                  <Card key={quiz.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{quiz.name}</CardTitle>
+                          {quiz.description && (
+                            <CardDescription className="mt-1">
+                              {quiz.description}
+                            </CardDescription>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenQuizDialog(quiz)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteQuiz(quiz.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">{quiz.questions.length} questions</Badge>
+                        <Badge variant="outline">{quiz.points_per_question} pts each</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Form Builder Dialog */}
-        <Dialog open={showFormDialog} onOpenChange={handleCloseDialog}>
+        <Dialog open={showFormDialog} onOpenChange={handleCloseFormDialog}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -329,7 +460,7 @@ export default function AdminForms() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {fields.map((field, index) => (
+                    {fields.map((field) => (
                       <div
                         key={field.id}
                         className="flex items-start gap-3 p-4 border rounded-lg bg-muted/30"
@@ -424,10 +555,10 @@ export default function AdminForms() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={handleCloseDialog}>
+              <Button variant="outline" onClick={handleCloseFormDialog}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSaveForm} disabled={saving}>
                 {saving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -442,6 +573,18 @@ export default function AdminForms() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Quiz Builder Dialog */}
+        {showQuizDialog && (
+          <QuizBuilder
+            quiz={editingQuiz}
+            onClose={handleCloseQuizDialog}
+            onSuccess={() => {
+              handleCloseQuizDialog();
+              fetchData();
+            }}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

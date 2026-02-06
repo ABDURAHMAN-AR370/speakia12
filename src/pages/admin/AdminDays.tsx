@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Image, Video, Link as LinkIcon, Headphones, Edit, Trash2 } from "lucide-react";
+import { Plus, FileText, Image, Video, Link as LinkIcon, Headphones, Edit, Trash2, HelpCircle, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AddMaterialDialog from "@/components/admin/AddMaterialDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ interface Material {
   material_type: string;
   material_url: string | null;
   form_id: string | null;
+  quiz_id: string | null;
   order_index: number;
 }
 
@@ -98,6 +99,10 @@ export default function AdminDays() {
         return LinkIcon;
       case "audio":
         return Headphones;
+      case "form":
+        return ClipboardList;
+      case "quiz":
+        return HelpCircle;
       default:
         return FileText;
     }
@@ -205,9 +210,9 @@ export default function AdminDays() {
                             <Badge variant="secondary" className="text-xs">
                               {material.material_type}
                             </Badge>
-                            {material.form_id && (
+                            {material.quiz_id && (
                               <Badge variant="outline" className="text-xs">
-                                Form
+                                Quiz
                               </Badge>
                             )}
                           </div>

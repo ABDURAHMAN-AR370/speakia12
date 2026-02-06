@@ -10,6 +10,7 @@ export interface UserProfile {
   gender: string;
   place: string;
   whatsapp_number: string;
+  batch_number: number;
   created_at: string;
   updated_at: string;
 }
@@ -67,11 +68,18 @@ export async function signUp(
   place: string,
   whatsappNumber: string
 ): Promise<{ success: boolean; error?: string }> {
-  // First check if email is whitelisted
-  const isWhitelisted = await checkEmailWhitelisted(email);
-  if (!isWhitelisted) {
+  // First check if email is whitelisted and get batch number
+  const { data: whitelistData, error: whitelistError } = await supabase
+    .from("whitelist")
+    .select("id, batch_number")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+
+  if (whitelistError || !whitelistData) {
     return { success: false, error: "Your email is not authorized to register. Please contact the administrator." };
   }
+
+  const batchNumber = whitelistData.batch_number || 1;
 
   // Sign up the user
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -90,7 +98,7 @@ export async function signUp(
     return { success: false, error: "Registration failed. Please try again." };
   }
 
-  // Create profile
+  // Create profile with batch number
   const { error: profileError } = await supabase.from("profiles").insert({
     user_id: authData.user.id,
     email: email.toLowerCase(),
@@ -98,6 +106,7 @@ export async function signUp(
     gender,
     place,
     whatsapp_number: whatsappNumber,
+    batch_number: batchNumber,
   });
 
   if (profileError) {
