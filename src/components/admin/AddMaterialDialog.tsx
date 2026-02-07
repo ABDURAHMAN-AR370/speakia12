@@ -134,12 +134,12 @@ export default function AddMaterialDialog({
     // Material attachment is mandatory based on type
     switch (formData.material_type) {
       case "form":
-        if (!formData.form_id) {
+        if (!formData.form_id || formData.form_id === "") {
           return "Please select a form";
         }
         break;
       case "quiz":
-        if (!formData.quiz_id) {
+        if (!formData.quiz_id || formData.quiz_id === "") {
           return "Please select a quiz";
         }
         break;
@@ -147,7 +147,7 @@ export default function AddMaterialDialog({
       case "video":
       case "audio":
       case "link":
-        if (!formData.material_url.trim()) {
+        if (!formData.material_url || !formData.material_url.trim()) {
           return "Please provide a URL or upload a file";
         }
         break;

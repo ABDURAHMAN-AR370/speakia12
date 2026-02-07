@@ -146,6 +146,48 @@ export type Database = {
           },
         ]
       }
+      hero_slides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_duration: number
+          id: string
+          is_active: boolean
+          media_type: string
+          media_url: string
+          order_index: number
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_duration?: number
+          id?: string
+          is_active?: boolean
+          media_type: string
+          media_url: string
+          order_index?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_duration?: number
+          id?: string
+          is_active?: boolean
+          media_type?: string
+          media_url?: string
+          order_index?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           batch_number: number
