@@ -11,7 +11,8 @@ import {
   Calendar, 
   FileText,
   Menu,
-  X
+  X,
+  Image
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/days", label: "Days & Materials", icon: Calendar },
-    { href: "/admin/forms", label: "Form Builder", icon: FileText },
+    { href: "/admin/forms", label: "Forms & Quizzes", icon: FileText },
+    { href: "/admin/hero", label: "Homepage Hero", icon: Image },
   ];
 
   const userLinks = [
