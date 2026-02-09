@@ -257,24 +257,24 @@ export default function AdminForms() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="forms" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Forms
-            </TabsTrigger>
-            <TabsTrigger value="quizzes" className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              Quizzes
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="forms" className="gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Forms</span>
+              </TabsTrigger>
+              <TabsTrigger value="quizzes" className="gap-2">
+                <HelpCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Quizzes</span>
+              </TabsTrigger>
+            </TabsList>
+            <Button size="sm" onClick={() => activeTab === "forms" ? handleOpenFormDialog() : handleOpenQuizDialog()}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{activeTab === "forms" ? "Create Form" : "Create Quiz"}</span>
+            </Button>
+          </div>
 
           <TabsContent value="forms" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => handleOpenFormDialog()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Form
-              </Button>
-            </div>
 
             {loading ? (
               <div className="text-center py-12">Loading...</div>
@@ -342,12 +342,6 @@ export default function AdminForms() {
           </TabsContent>
 
           <TabsContent value="quizzes" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => handleOpenQuizDialog()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Quiz
-              </Button>
-            </div>
 
             {loading ? (
               <div className="text-center py-12">Loading...</div>

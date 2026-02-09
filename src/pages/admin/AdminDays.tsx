@@ -120,12 +120,12 @@ export default function AdminDays() {
               Manage course content for each day
             </p>
           </div>
-          <Button onClick={() => {
+          <Button size="sm" onClick={() => {
             setEditingMaterial(null);
             setShowAddDialog(true);
           }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Material
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Material</span>
           </Button>
         </div>
 

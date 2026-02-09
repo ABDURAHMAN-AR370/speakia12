@@ -332,21 +332,21 @@ export default function AdminUsers() {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">User Management</h1>
             <p className="text-muted-foreground mt-1">
               Manage whitelist, batches, and view user progress
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowBulkDialog(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Bulk Import
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => setShowBulkDialog(true)} className="flex-1 sm:flex-none">
+              <Upload className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Bulk Import</span>
             </Button>
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Email
+            <Button size="sm" onClick={() => setShowAddDialog(true)} className="flex-1 sm:flex-none">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Email</span>
             </Button>
           </div>
         </div>
