@@ -114,3 +114,24 @@
     @apply bg-card/80 backdrop-blur-sm border shadow-sm;
   }
 }
+
+/* Marquee animation for long material titles on mobile */
+@media (max-width: 640px) {
+  .material-title-marquee {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* Fade-in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}

@@ -58,10 +58,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <div className="flex items-center gap-2 ml-2">
+          <Link to="/" className="flex items-center gap-2 ml-2">
             <BookOpen className="h-5 w-5 text-primary" />
             <span className="font-bold">SPEAKAI</span>
-          </div>
+          </Link>
         </div>
       </header>
 
@@ -69,19 +69,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar text-sidebar-foreground transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-auto",
+            "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground lg:sticky lg:top-0 lg:h-screen transition-transform duration-200 ease-in-out lg:translate-x-0",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="flex h-full flex-col">
+          <div className="flex h-full flex-col overflow-hidden">
             {/* Logo */}
-            <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-              <BookOpen className="h-6 w-6 text-sidebar-primary" />
-              <span className="text-xl font-bold">SPEAKAI</span>
+            <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 shrink-0">
+              <Link to="/" className="flex items-center gap-2">
+                <BookOpen className="h-6 w-6 text-sidebar-primary" />
+                <span className="text-xl font-bold">SPEAKAI</span>
+              </Link>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 space-y-1 px-3 py-4">
+            <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
               {links.map((link) => {
                 const Icon = link.icon;
                 const isActive = location.pathname === link.href;
@@ -105,7 +107,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </nav>
 
             {/* User Info & Logout */}
-            <div className="border-t border-sidebar-border p-4">
+            <div className="border-t border-sidebar-border p-4 shrink-0">
               <div className="mb-3">
                 <p className="text-sm font-medium truncate">
                   {profile?.full_name || user?.email}
@@ -135,7 +137,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-h-screen">
+        <main className="flex-1 min-h-screen min-w-0">
           <div className="container py-6 lg:py-8">
             {children}
           </div>
