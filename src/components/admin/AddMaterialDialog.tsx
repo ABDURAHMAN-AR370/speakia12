@@ -1,24 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -33,31 +22,21 @@ interface Material {
   form_id: string | null;
   quiz_id: string | null;
   order_index: number;
+  min_completion_time?: number;
 }
 
-interface Form {
-  id: string;
-  name: string;
-}
-
-interface Quiz {
-  id: string;
-  name: string;
-}
+interface Form { id: string; name: string; }
+interface Quiz { id: string; name: string; }
 
 interface AddMaterialDialogProps {
   defaultDay?: number;
   editingMaterial: Material | null;
+  totalDays?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function AddMaterialDialog({
-  defaultDay,
-  editingMaterial,
-  onClose,
-  onSuccess,
-}: AddMaterialDialogProps) {
+export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDays = 30, onClose, onSuccess }: AddMaterialDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [forms, setForms] = useState<Form[]>([]);
@@ -73,6 +52,7 @@ export default function AddMaterialDialog({
     form_id: editingMaterial?.form_id || "",
     quiz_id: editingMaterial?.quiz_id || "",
     order_index: editingMaterial?.order_index?.toString() || "0",
+    min_completion_time: editingMaterial?.min_completion_time?.toString() || "0",
   });
 
   useEffect(() => {
@@ -95,73 +75,41 @@ export default function AddMaterialDialog({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `materials/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("course-materials")
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from("course-materials").upload(`materials/${fileName}`, file);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("course-materials")
-        .getPublicUrl(filePath);
-
+      const { data: urlData } = supabase.storage.from("course-materials").getPublicUrl(`materials/${fileName}`);
       handleChange("material_url", urlData.publicUrl);
       toast({ title: "File uploaded successfully" });
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast({
-        title: "Upload failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
     } finally {
       setUploading(false);
     }
   };
 
   const validateMaterial = (): string | null => {
-    if (!formData.work_type.trim()) {
-      return "Work type is required";
-    }
-
-    // Material attachment is mandatory based on type
+    if (!formData.work_type.trim()) return "Work type is required";
     switch (formData.material_type) {
       case "form":
-        if (!formData.form_id || formData.form_id === "") {
-          return "Please select a form";
-        }
+        if (!formData.form_id || formData.form_id === "") return "Please select a form";
         break;
       case "quiz":
-        if (!formData.quiz_id || formData.quiz_id === "") {
-          return "Please select a quiz";
-        }
+        if (!formData.quiz_id || formData.quiz_id === "") return "Please select a quiz";
         break;
-      case "image":
-      case "video":
-      case "audio":
-      case "link":
-        if (!formData.material_url || !formData.material_url.trim()) {
-          return "Please provide a URL or upload a file";
-        }
+      case "image": case "video": case "audio": case "link":
+        if (!formData.material_url || !formData.material_url.trim()) return "Please provide a URL or upload a file";
         break;
     }
-
     return null;
   };
 
   const handleSubmit = async () => {
     const error = validateMaterial();
-    if (error) {
-      toast({ title: error, variant: "destructive" });
-      return;
-    }
+    if (error) { toast({ title: error, variant: "destructive" }); return; }
 
     setLoading(true);
     try {
@@ -174,31 +122,22 @@ export default function AddMaterialDialog({
         form_id: formData.material_type === "form" ? formData.form_id : null,
         quiz_id: formData.material_type === "quiz" ? formData.quiz_id : null,
         order_index: parseInt(formData.order_index),
+        min_completion_time: parseInt(formData.min_completion_time) || 0,
         created_by: user?.id,
       };
 
       if (editingMaterial) {
-        const { error } = await supabase
-          .from("course_materials")
-          .update(materialData)
-          .eq("id", editingMaterial.id);
+        const { error } = await supabase.from("course_materials").update(materialData).eq("id", editingMaterial.id);
         if (error) throw error;
         toast({ title: "Material updated" });
       } else {
-        const { error } = await supabase
-          .from("course_materials")
-          .insert(materialData);
+        const { error } = await supabase.from("course_materials").insert(materialData);
         if (error) throw error;
         toast({ title: "Material added" });
       }
-
       onSuccess();
-    } catch (error) {
-      console.error("Save error:", error);
-      toast({
-        title: "Failed to save material",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Failed to save material", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -210,15 +149,11 @@ export default function AddMaterialDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editingMaterial ? "Edit Material" : "Add Material"}
-          </DialogTitle>
+          <DialogTitle>{editingMaterial ? "Edit Material" : "Add Material"}</DialogTitle>
           <DialogDescription>
-            {editingMaterial
-              ? "Update the material details"
-              : "Add new learning material to a course day"}
+            {editingMaterial ? "Update the material details" : "Add new learning material to a course day"}
           </DialogDescription>
         </DialogHeader>
 
@@ -226,62 +161,35 @@ export default function AddMaterialDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Day</Label>
-              <Select
-                value={formData.day_number}
-                onValueChange={(v) => handleChange("day_number", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={formData.day_number} onValueChange={(v) => handleChange("day_number", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Array.from({ length: 30 }, (_, i) => (
-                    <SelectItem key={i + 1} value={(i + 1).toString()}>
-                      Day {i + 1}
-                    </SelectItem>
+                  {Array.from({ length: totalDays }, (_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>Day {i + 1}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Order</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.order_index}
-                onChange={(e) => handleChange("order_index", e.target.value)}
-              />
+              <Input type="number" min="0" value={formData.order_index} onChange={(e) => handleChange("order_index", e.target.value)} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Work Type / Title</Label>
-            <Input
-              placeholder="e.g., Vocabulary Practice"
-              value={formData.work_type}
-              onChange={(e) => handleChange("work_type", e.target.value)}
-            />
+            <Input placeholder="e.g., Vocabulary Practice" value={formData.work_type} onChange={(e) => handleChange("work_type", e.target.value)} />
           </div>
 
           <div className="space-y-2">
             <Label>Details / Description</Label>
-            <Textarea
-              placeholder="Describe the material..."
-              value={formData.details}
-              onChange={(e) => handleChange("details", e.target.value)}
-              rows={3}
-            />
+            <Textarea placeholder="Describe the material..." value={formData.details} onChange={(e) => handleChange("details", e.target.value)} rows={3} />
           </div>
 
           <div className="space-y-2">
             <Label>Material Type</Label>
-            <Select
-              value={formData.material_type}
-              onValueChange={(v) => handleChange("material_type", v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={formData.material_type} onValueChange={(v) => handleChange("material_type", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="image">Image</SelectItem>
                 <SelectItem value="video">Video</SelectItem>
@@ -295,62 +203,28 @@ export default function AddMaterialDialog({
 
           {showUrlField && (
             <div className="space-y-2">
-              <Label>
-                {formData.material_type === "link" ? "URL *" : "Upload or URL *"}
-              </Label>
+              <Label>{formData.material_type === "link" ? "URL *" : "Upload or URL *"}</Label>
               {formData.material_type !== "link" && (
                 <div className="mb-2">
-                  <Input
-                    type="file"
-                    accept={
-                      formData.material_type === "image"
-                        ? "image/*"
-                        : formData.material_type === "video"
-                        ? "video/*"
-                        : formData.material_type === "audio"
-                        ? "audio/*"
-                        : "*"
-                    }
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                  />
-                  {uploading && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Uploading...
-                    </p>
-                  )}
+                  <Input type="file" accept={formData.material_type === "image" ? "image/*" : formData.material_type === "video" ? "video/*" : formData.material_type === "audio" ? "audio/*" : "*"} onChange={handleFileUpload} disabled={uploading} />
+                  {uploading && <p className="text-sm text-muted-foreground mt-1">Uploading...</p>}
                 </div>
               )}
-              <Input
-                placeholder="https://..."
-                value={formData.material_url}
-                onChange={(e) => handleChange("material_url", e.target.value)}
-              />
+              <Input placeholder="https://..." value={formData.material_url} onChange={(e) => handleChange("material_url", e.target.value)} />
             </div>
           )}
 
           {showFormSelect && (
             <div className="space-y-2">
               <Label>Select Form *</Label>
-              <Select
-                value={formData.form_id}
-                onValueChange={(v) => handleChange("form_id", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a form" />
-                </SelectTrigger>
+              <Select value={formData.form_id} onValueChange={(v) => handleChange("form_id", v)}>
+                <SelectTrigger><SelectValue placeholder="Choose a form" /></SelectTrigger>
                 <SelectContent>
                   {forms.length === 0 ? (
-                    <SelectItem value="" disabled>
-                      No forms available - create one first
-                    </SelectItem>
-                  ) : (
-                    forms.map((form) => (
-                      <SelectItem key={form.id} value={form.id}>
-                        {form.name}
-                      </SelectItem>
-                    ))
-                  )}
+                    <SelectItem value="" disabled>No forms available</SelectItem>
+                  ) : forms.map((form) => (
+                    <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -359,46 +233,36 @@ export default function AddMaterialDialog({
           {showQuizSelect && (
             <div className="space-y-2">
               <Label>Select Quiz *</Label>
-              <Select
-                value={formData.quiz_id}
-                onValueChange={(v) => handleChange("quiz_id", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a quiz" />
-                </SelectTrigger>
+              <Select value={formData.quiz_id} onValueChange={(v) => handleChange("quiz_id", v)}>
+                <SelectTrigger><SelectValue placeholder="Choose a quiz" /></SelectTrigger>
                 <SelectContent>
                   {quizzes.length === 0 ? (
-                    <SelectItem value="" disabled>
-                      No quizzes available - create one first
-                    </SelectItem>
-                  ) : (
-                    quizzes.map((quiz) => (
-                      <SelectItem key={quiz.id} value={quiz.id}>
-                        {quiz.name}
-                      </SelectItem>
-                    ))
-                  )}
+                    <SelectItem value="" disabled>No quizzes available</SelectItem>
+                  ) : quizzes.map((quiz) => (
+                    <SelectItem key={quiz.id} value={quiz.id}>{quiz.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Min. Completion Time (seconds, optional)</Label>
+            <Input
+              type="number"
+              min="0"
+              placeholder="0 = no minimum"
+              value={formData.min_completion_time}
+              onChange={(e) => handleChange("min_completion_time", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Set minimum time before user can mark as completed (0 = instant)</p>
+          </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={loading || uploading}>
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Saving...
-              </>
-            ) : editingMaterial ? (
-              "Update Material"
-            ) : (
-              "Add Material"
-            )}
+            {loading ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>) : editingMaterial ? "Update Material" : "Add Material"}
           </Button>
         </DialogFooter>
       </DialogContent>

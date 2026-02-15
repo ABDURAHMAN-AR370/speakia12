@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Check, Lock, FileText, Image, Video, Link as LinkIcon, Headphones, HelpCircle, ClipboardList, Eye } from "lucide-react";
+import { ArrowLeft, Check, Lock, FileText, Image, Video, Link as LinkIcon, Headphones, HelpCircle, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MaterialViewer from "@/components/MaterialViewer";
 import FormSubmissionDialog from "@/components/FormSubmissionDialog";
@@ -24,6 +24,7 @@ interface Material {
   form_id: string | null;
   quiz_id: string | null;
   order_index: number;
+  min_completion_time?: number;
 }
 
 interface FormField {
@@ -70,7 +71,6 @@ export default function DayDetail() {
   const [showResponse, setShowResponse] = useState(false);
   const [currentForm, setCurrentForm] = useState<CustomForm | null>(null);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  // For viewing responses
   const [viewFormResponses, setViewFormResponses] = useState<Record<string, unknown> | null>(null);
   const [viewFormSubmissionId, setViewFormSubmissionId] = useState<string | null>(null);
   const [viewQuizAnswers, setViewQuizAnswers] = useState<Record<string, string> | null>(null);
@@ -79,9 +79,7 @@ export default function DayDetail() {
   const day = parseInt(dayNumber || "1");
 
   useEffect(() => {
-    if (user) {
-      fetchDayData();
-    }
+    if (user) fetchDayData();
   }, [user, day]);
 
   const fetchDayData = async () => {
@@ -114,8 +112,7 @@ export default function DayDetail() {
 
   const isMaterialUnlocked = (index: number): boolean => {
     if (index === 0) return true;
-    const previousMaterial = materials[index - 1];
-    return completedMaterials.has(previousMaterial.id);
+    return completedMaterials.has(materials[index - 1].id);
   };
 
   const handleMaterialClick = async (material: Material, index: number) => {
@@ -123,11 +120,9 @@ export default function DayDetail() {
 
     const isCompleted = completedMaterials.has(material.id);
 
-    // If completed, show the response
     if (isCompleted) {
       setSelectedMaterial(material);
       if (material.form_id) {
-        // Fetch form + submission
         const [formRes, subRes] = await Promise.all([
           supabase.from("custom_forms").select("*").eq("id", material.form_id).single(),
           supabase.from("form_submissions").select("*").eq("material_id", material.id).eq("user_id", user?.id).single(),
@@ -158,7 +153,6 @@ export default function DayDetail() {
         }
         setShowResponse(true);
       } else {
-        // Just show the material viewer for non-form/quiz completed items
         setSelectedMaterial(material);
       }
       return;
@@ -248,7 +242,7 @@ export default function DayDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in max-w-full overflow-hidden">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-5 w-5" />
@@ -288,12 +282,12 @@ export default function DayDetail() {
                 >
                   <CardHeader className="p-4">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", isCompleted ? "bg-success/20" : "bg-primary/10")}>
                           <Icon className={cn("h-5 w-5", isCompleted ? "text-success" : "text-primary")} />
                         </div>
-                        <div className="min-w-0">
-                          <CardTitle className="text-lg truncate material-title-marquee">{material.work_type}</CardTitle>
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-base sm:text-lg truncate">{material.work_type}</CardTitle>
                           <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge variant="secondary" className="text-xs">{material.material_type}</Badge>
                             {material.form_id && <Badge variant="outline" className="text-xs"><FileText className="h-3 w-3 mr-1" />Form</Badge>}
@@ -316,7 +310,7 @@ export default function DayDetail() {
                   </CardHeader>
                   {material.details && (
                     <CardContent className="pt-0 px-4 pb-4">
-                      <p className="text-sm text-muted-foreground">{material.details}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{material.details}</p>
                     </CardContent>
                   )}
                 </Card>
@@ -325,7 +319,7 @@ export default function DayDetail() {
           </div>
         )}
 
-        {/* Material Viewer Dialog (for non-form/quiz or uncompleted) */}
+        {/* Material Viewer Dialog */}
         {selectedMaterial && !showForm && !showQuiz && !showResponse && (
           <MaterialViewer
             material={selectedMaterial}
@@ -343,7 +337,6 @@ export default function DayDetail() {
           />
         )}
 
-        {/* Form Submission Dialog */}
         {showForm && currentForm && selectedMaterial && (
           <FormSubmissionDialog
             form={currentForm}
@@ -353,7 +346,6 @@ export default function DayDetail() {
           />
         )}
 
-        {/* Quiz Taker Dialog */}
         {showQuiz && currentQuiz && selectedMaterial && (
           <QuizTaker
             quiz={currentQuiz}
@@ -363,7 +355,6 @@ export default function DayDetail() {
           />
         )}
 
-        {/* Response Viewer */}
         {showResponse && selectedMaterial && (
           <>
             {currentForm && viewFormResponses && (

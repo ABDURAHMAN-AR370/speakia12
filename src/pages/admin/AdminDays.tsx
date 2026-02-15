@@ -4,10 +4,13 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Image, Video, Link as LinkIcon, Headphones, Edit, Trash2, HelpCircle, ClipboardList } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Plus, FileText, Image, Video, Link as LinkIcon, Headphones, Edit, Trash2, HelpCircle, ClipboardList, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AddMaterialDialog from "@/components/admin/AddMaterialDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useTotalDays } from "@/hooks/useTotalDays";
 
 interface Material {
   id: string;
@@ -28,15 +31,18 @@ interface DayData {
 
 export default function AdminDays() {
   const { toast } = useToast();
+  const { totalDays, updateTotalDays } = useTotalDays();
   const [days, setDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [showDayCountEditor, setShowDayCountEditor] = useState(false);
+  const [newDayCount, setNewDayCount] = useState(totalDays.toString());
 
   useEffect(() => {
     fetchMaterials();
-  }, []);
+  }, [totalDays]);
 
   const fetchMaterials = async () => {
     try {
@@ -48,9 +54,8 @@ export default function AdminDays() {
 
       if (error) throw error;
 
-      // Group materials by day
       const dayMap = new Map<number, Material[]>();
-      for (let i = 1; i <= 30; i++) {
+      for (let i = 1; i <= totalDays; i++) {
         dayMap.set(i, []);
       }
       data?.forEach((material) => {
@@ -72,39 +77,39 @@ export default function AdminDays() {
 
   const handleDeleteMaterial = async (materialId: string) => {
     try {
-      const { error } = await supabase
-        .from("course_materials")
-        .delete()
-        .eq("id", materialId);
-
+      const { error } = await supabase.from("course_materials").delete().eq("id", materialId);
       if (error) throw error;
-
       toast({ title: "Material deleted" });
       fetchMaterials();
-    } catch (error) {
-      toast({
-        title: "Failed to delete material",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Failed to delete material", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateDayCount = async () => {
+    const count = parseInt(newDayCount);
+    if (isNaN(count) || count < 1 || count > 365) {
+      toast({ title: "Day count must be between 1 and 365", variant: "destructive" });
+      return;
+    }
+    const success = await updateTotalDays(count);
+    if (success) {
+      toast({ title: `Course updated to ${count} days` });
+      setShowDayCountEditor(false);
+    } else {
+      toast({ title: "Failed to update", variant: "destructive" });
     }
   };
 
   const getMaterialIcon = (type: string) => {
     switch (type) {
-      case "image":
-        return Image;
-      case "video":
-        return Video;
-      case "link":
-        return LinkIcon;
-      case "audio":
-        return Headphones;
-      case "form":
-        return ClipboardList;
-      case "quiz":
-        return HelpCircle;
-      default:
-        return FileText;
+      case "image": return Image;
+      case "video": return Video;
+      case "link": return LinkIcon;
+      case "audio": return Headphones;
+      case "form": return ClipboardList;
+      case "quiz": return HelpCircle;
+      default: return FileText;
     }
   };
 
@@ -113,31 +118,55 @@ export default function AdminDays() {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Days & Materials</h1>
             <p className="text-muted-foreground mt-1">
               Manage course content for each day
             </p>
           </div>
-          <Button size="sm" onClick={() => {
-            setEditingMaterial(null);
-            setShowAddDialog(true);
-          }}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Material</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setShowDayCountEditor(!showDayCountEditor); setNewDayCount(totalDays.toString()); }}>
+              <Settings className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{totalDays} Days</span>
+            </Button>
+            <Button size="sm" onClick={() => { setEditingMaterial(null); setShowAddDialog(true); }}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Material</span>
+            </Button>
+          </div>
         </div>
 
+        {showDayCountEditor && (
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-end gap-3">
+                <div className="space-y-1">
+                  <Label>Total Course Days</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={newDayCount}
+                    onChange={(e) => setNewDayCount(e.target.value)}
+                    className="w-24"
+                  />
+                </div>
+                <Button size="sm" onClick={handleUpdateDayCount}>Save</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowDayCountEditor(false)}>Cancel</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Days Grid */}
           <Card>
             <CardHeader>
               <CardTitle>Course Days</CardTitle>
               <CardDescription>Click a day to view its materials</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {days.map((day) => (
                   <Button
                     key={day.dayNumber}
@@ -158,16 +187,13 @@ export default function AdminDays() {
             </CardContent>
           </Card>
 
-          {/* Materials List */}
           <Card>
             <CardHeader>
               <CardTitle>
                 {selectedDay ? `Day ${selectedDay} Materials` : "Select a Day"}
               </CardTitle>
               <CardDescription>
-                {selectedDay
-                  ? `${selectedDayData?.materials.length || 0} materials`
-                  : "Click a day to view its materials"}
+                {selectedDay ? `${selectedDayData?.materials.length || 0} materials` : "Click a day to view its materials"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -178,15 +204,8 @@ export default function AdminDays() {
               ) : selectedDayData?.materials.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground mb-4">No materials for this day</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditingMaterial(null);
-                      setShowAddDialog(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Material
+                  <Button variant="outline" onClick={() => { setEditingMaterial(null); setShowAddDialog(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />Add Material
                   </Button>
                 </div>
               ) : (
@@ -194,45 +213,25 @@ export default function AdminDays() {
                   {selectedDayData?.materials.map((material, index) => {
                     const Icon = getMaterialIcon(material.material_type);
                     return (
-                      <div
-                        key={material.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-card"
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 rounded bg-primary/10 text-primary text-sm font-medium">
+                      <div key={material.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                        <div className="flex items-center justify-center w-8 h-8 rounded bg-primary/10 text-primary text-sm font-medium shrink-0">
                           {index + 1}
                         </div>
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                           <Icon className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{material.work_type}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {material.material_type}
-                            </Badge>
-                            {material.quiz_id && (
-                              <Badge variant="outline" className="text-xs">
-                                Quiz
-                              </Badge>
-                            )}
+                            <Badge variant="secondary" className="text-xs">{material.material_type}</Badge>
+                            {material.quiz_id && <Badge variant="outline" className="text-xs">Quiz</Badge>}
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditingMaterial(material);
-                              setShowAddDialog(true);
-                            }}
-                          >
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingMaterial(material); setShowAddDialog(true); }}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteMaterial(material.id)}
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteMaterial(material.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -245,20 +244,13 @@ export default function AdminDays() {
           </Card>
         </div>
 
-        {/* Add/Edit Material Dialog */}
         {showAddDialog && (
           <AddMaterialDialog
             defaultDay={selectedDay || undefined}
             editingMaterial={editingMaterial}
-            onClose={() => {
-              setShowAddDialog(false);
-              setEditingMaterial(null);
-            }}
-            onSuccess={() => {
-              setShowAddDialog(false);
-              setEditingMaterial(null);
-              fetchMaterials();
-            }}
+            totalDays={totalDays}
+            onClose={() => { setShowAddDialog(false); setEditingMaterial(null); }}
+            onSuccess={() => { setShowAddDialog(false); setEditingMaterial(null); fetchMaterials(); }}
           />
         )}
       </div>
