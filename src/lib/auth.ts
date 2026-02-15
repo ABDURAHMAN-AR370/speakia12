@@ -11,6 +11,9 @@ export interface UserProfile {
   place: string;
   whatsapp_number: string;
   batch_number: number;
+  referral_code: string | null;
+  referred_by: string | null;
+  signup_source: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,9 +69,10 @@ export async function signUp(
   fullName: string,
   gender: string,
   place: string,
-  whatsappNumber: string
+  whatsappNumber: string,
+  referredBy?: string,
+  signupSource?: string
 ): Promise<{ success: boolean; error?: string }> {
-  // First check if email is whitelisted and get batch number
   const { data: whitelistData, error: whitelistError } = await supabase
     .from("whitelist")
     .select("id, batch_number")
@@ -81,7 +85,6 @@ export async function signUp(
 
   const batchNumber = whitelistData.batch_number || 1;
 
-  // Sign up the user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: email.toLowerCase(),
     password,
@@ -98,7 +101,6 @@ export async function signUp(
     return { success: false, error: "Registration failed. Please try again." };
   }
 
-  // Create profile with batch number
   const { error: profileError } = await supabase.from("profiles").insert({
     user_id: authData.user.id,
     email: email.toLowerCase(),
@@ -107,6 +109,8 @@ export async function signUp(
     place,
     whatsapp_number: whatsappNumber,
     batch_number: batchNumber,
+    referred_by: referredBy || null,
+    signup_source: signupSource || null,
   });
 
   if (profileError) {

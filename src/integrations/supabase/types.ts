@@ -24,6 +24,7 @@ export type Database = {
           id: string
           material_type: string
           material_url: string | null
+          min_completion_time: number
           order_index: number
           quiz_id: string | null
           updated_at: string
@@ -38,6 +39,7 @@ export type Database = {
           id?: string
           material_type: string
           material_url?: string | null
+          min_completion_time?: number
           order_index?: number
           quiz_id?: string | null
           updated_at?: string
@@ -52,6 +54,7 @@ export type Database = {
           id?: string
           material_type?: string
           material_url?: string | null
+          min_completion_time?: number
           order_index?: number
           quiz_id?: string | null
           updated_at?: string
@@ -197,6 +200,9 @@ export type Database = {
           gender: string
           id: string
           place: string
+          referral_code: string | null
+          referred_by: string | null
+          signup_source: string | null
           updated_at: string
           user_id: string
           whatsapp_number: string
@@ -209,6 +215,9 @@ export type Database = {
           gender: string
           id?: string
           place: string
+          referral_code?: string | null
+          referred_by?: string | null
+          signup_source?: string | null
           updated_at?: string
           user_id: string
           whatsapp_number: string
@@ -221,6 +230,9 @@ export type Database = {
           gender?: string
           id?: string
           place?: string
+          referral_code?: string | null
+          referred_by?: string | null
+          signup_source?: string | null
           updated_at?: string
           user_id?: string
           whatsapp_number?: string
@@ -308,6 +320,27 @@ export type Database = {
         }
         Relationships: []
       }
+      settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       user_progress: {
         Row: {
           completed_at: string
@@ -365,6 +398,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          password_reset_enabled: boolean
         }
         Insert: {
           added_by?: string | null
@@ -372,6 +406,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          password_reset_enabled?: boolean
         }
         Update: {
           added_by?: string | null
@@ -379,6 +414,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          password_reset_enabled?: boolean
         }
         Relationships: []
       }

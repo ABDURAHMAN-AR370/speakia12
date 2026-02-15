@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ interface Material {
   material_url: string | null;
   form_id: string | null;
   quiz_id?: string | null;
+  min_completion_time?: number;
 }
 
 interface MaterialViewerProps {
@@ -21,15 +23,38 @@ interface MaterialViewerProps {
 }
 
 export default function MaterialViewer({ material, isCompleted, onClose, onComplete }: MaterialViewerProps) {
-  // For form/quiz types without a media URL, show a prompt
-  const isFormOrQuiz = material.material_type === "form" || material.material_type === "quiz";
+  const isFormOrQuiz = material.material_type === "form" || material.material_type === "quiz" || !!material.form_id || !!material.quiz_id;
+  const minTime = material.min_completion_time || 0;
+  const [timeLeft, setTimeLeft] = useState(minTime);
+  const [canComplete, setCanComplete] = useState(minTime === 0);
+
+  useEffect(() => {
+    if (minTime <= 0 || isCompleted) {
+      setCanComplete(true);
+      return;
+    }
+    setTimeLeft(minTime);
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          setCanComplete(true);
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [minTime, isCompleted]);
 
   const renderContent = () => {
     if (isFormOrQuiz && !material.material_url) {
       return (
         <div className="py-8 text-center">
           <p className="text-muted-foreground">
-            {material.material_type === "quiz" ? "Click below to take the quiz." : "Click below to fill the form."}
+            {material.quiz_id || material.material_type === "quiz"
+              ? "Click below to take the quiz."
+              : "Click below to fill the form."}
           </p>
         </div>
       );
@@ -64,12 +89,24 @@ export default function MaterialViewer({ material, isCompleted, onClose, onCompl
         ) : (
           <p className="text-muted-foreground text-center py-8">No link available</p>
         );
+      case "form":
+      case "quiz":
+        return (
+          <div className="py-8 text-center">
+            <p className="text-muted-foreground">
+              {material.material_type === "quiz" ? "Click below to take the quiz." : "Click below to fill the form."}
+            </p>
+          </div>
+        );
       default:
         return <p className="text-muted-foreground text-center py-8">Content not available</p>;
     }
   };
 
   const getButtonLabel = () => {
+    if (!canComplete && !isCompleted) {
+      return `Wait ${timeLeft}s`;
+    }
     if (material.quiz_id || material.material_type === "quiz") return "Start Quiz";
     if (material.form_id || material.material_type === "form") return "Continue to Form";
     return <><Check className="h-4 w-4 mr-2" />Mark as Complete</>;
@@ -91,7 +128,9 @@ export default function MaterialViewer({ material, isCompleted, onClose, onCompl
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
           {!isCompleted && (
-            <Button onClick={onComplete}>{getButtonLabel()}</Button>
+            <Button onClick={onComplete} disabled={!canComplete}>
+              {getButtonLabel()}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
