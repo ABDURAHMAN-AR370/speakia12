@@ -41,8 +41,10 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
     setAnswers(prev => ({ ...prev, [questionId]: value }));
   };
 
-  const handleSubmit = async () => {
-    // Grade the quiz
+  // Auto-save: grade and submit in one step
+  const handleCheckAndSubmit = async () => {
+    setLoading(true);
+
     let score = 0;
     const maxScore = quiz.questions.reduce((sum, q) => sum + (q.points || quiz.points_per_question), 0);
     const details: Record<string, boolean> = {};
@@ -52,25 +54,23 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
       const correct = Array.isArray(q.correctAnswer)
         ? q.correctAnswer.map(a => a.toLowerCase())
         : [q.correctAnswer.toLowerCase()];
-
       const isCorrect = correct.includes(userAnswer);
       details[q.id] = isCorrect;
       if (isCorrect) score += q.points || quiz.points_per_question;
     });
 
-    setResults({ score, maxScore, details });
+    const finalResults = { score, maxScore, details };
+    setResults(finalResults);
     setShowResults(true);
-  };
 
-  const handleFinalSubmit = async () => {
-    setLoading(true);
-    await onSubmit(answers, results.score, results.maxScore);
+    // Immediately save
+    await onSubmit(answers, score, maxScore);
     setLoading(false);
   };
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl mx-2">
         <DialogHeader>
           <DialogTitle>{quiz.name}</DialogTitle>
           {quiz.description && <p className="text-sm text-muted-foreground">{quiz.description}</p>}
@@ -79,7 +79,7 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
 
         <div className="space-y-6 py-4">
           {quiz.questions.map((q, idx) => (
-            <div key={q.id} className="space-y-2 p-4 border rounded-lg">
+            <div key={q.id} className="space-y-2 p-4 border rounded-xl">
               <div className="flex items-start justify-between">
                 <Label className="font-medium">
                   {idx + 1}. {q.question}
@@ -91,7 +91,7 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
               {showResults && (
                 <div className="flex items-center gap-1 text-sm">
                   {results.details[q.id] ? (
-                    <><CheckCircle className="h-4 w-4 text-green-600" /><span className="text-green-600">Correct</span></>
+                    <><CheckCircle className="h-4 w-4 text-green-500" /><span className="text-green-500">Correct</span></>
                   ) : (
                     <><XCircle className="h-4 w-4 text-destructive" /><span className="text-destructive">Incorrect — Answer: {Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : q.correctAnswer}</span></>
                   )}
@@ -99,11 +99,7 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
               )}
 
               {q.type === "mcq" && (
-                <RadioGroup
-                  value={answers[q.id] || ""}
-                  onValueChange={(v) => handleChange(q.id, v)}
-                  disabled={showResults}
-                >
+                <RadioGroup value={answers[q.id] || ""} onValueChange={(v) => handleChange(q.id, v)} disabled={showResults}>
                   {q.options?.map(opt => (
                     <div key={opt} className="flex items-center space-x-2">
                       <RadioGroupItem value={opt} id={`${q.id}-${opt}`} />
@@ -114,11 +110,7 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
               )}
 
               {q.type === "true_false" && (
-                <RadioGroup
-                  value={answers[q.id] || ""}
-                  onValueChange={(v) => handleChange(q.id, v)}
-                  disabled={showResults}
-                >
+                <RadioGroup value={answers[q.id] || ""} onValueChange={(v) => handleChange(q.id, v)} disabled={showResults}>
                   {["True", "False"].map(opt => (
                     <div key={opt} className="flex items-center space-x-2">
                       <RadioGroupItem value={opt} id={`${q.id}-${opt}`} />
@@ -141,10 +133,10 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
         </div>
 
         {showResults && (
-          <div className="p-4 rounded-lg bg-muted text-center">
+          <div className="p-4 rounded-xl bg-muted text-center">
             <p className="text-lg font-bold">Score: {results.score} / {results.maxScore}</p>
             <p className="text-sm text-muted-foreground">
-              {Math.round((results.score / results.maxScore) * 100)}%
+              {results.maxScore > 0 ? Math.round((results.score / results.maxScore) * 100) : 0}%
             </p>
           </div>
         )}
@@ -153,13 +145,9 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
           <Button variant="outline" onClick={onClose} disabled={loading}>
             {showResults ? "Close" : "Cancel"}
           </Button>
-          {!showResults ? (
-            <Button onClick={handleSubmit}>
-              Check Answers
-            </Button>
-          ) : (
-            <Button onClick={handleFinalSubmit} disabled={loading}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : "Submit & Complete"}
+          {!showResults && (
+            <Button onClick={handleCheckAndSubmit} disabled={loading}>
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : "Submit Quiz"}
             </Button>
           )}
         </DialogFooter>

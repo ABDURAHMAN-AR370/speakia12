@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      applications: {
+        Row: {
+          age: number
+          created_at: string
+          full_name: string
+          gender: string
+          id: string
+          place: string
+          referred_by_code: string | null
+          screenshot_url: string | null
+          whatsapp_number: string
+        }
+        Insert: {
+          age: number
+          created_at?: string
+          full_name: string
+          gender: string
+          id?: string
+          place: string
+          referred_by_code?: string | null
+          screenshot_url?: string | null
+          whatsapp_number: string
+        }
+        Update: {
+          age?: number
+          created_at?: string
+          full_name?: string
+          gender?: string
+          id?: string
+          place?: string
+          referred_by_code?: string | null
+          screenshot_url?: string | null
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
       course_materials: {
         Row: {
           created_at: string
@@ -199,6 +235,7 @@ export type Database = {
           full_name: string
           gender: string
           id: string
+          is_blocked: boolean
           place: string
           referral_code: string | null
           referred_by: string | null
@@ -214,6 +251,7 @@ export type Database = {
           full_name: string
           gender: string
           id?: string
+          is_blocked?: boolean
           place: string
           referral_code?: string | null
           referred_by?: string | null
@@ -229,6 +267,7 @@ export type Database = {
           full_name?: string
           gender?: string
           id?: string
+          is_blocked?: boolean
           place?: string
           referral_code?: string | null
           referred_by?: string | null
@@ -399,6 +438,7 @@ export type Database = {
           email: string
           id: string
           password_reset_enabled: boolean
+          phone_number: string | null
         }
         Insert: {
           added_by?: string | null
@@ -407,6 +447,7 @@ export type Database = {
           email: string
           id?: string
           password_reset_enabled?: boolean
+          phone_number?: string | null
         }
         Update: {
           added_by?: string | null
@@ -415,6 +456,7 @@ export type Database = {
           email?: string
           id?: string
           password_reset_enabled?: boolean
+          phone_number?: string | null
         }
         Relationships: []
       }

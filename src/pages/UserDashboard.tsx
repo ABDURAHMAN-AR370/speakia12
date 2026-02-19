@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useTotalDays } from "@/hooks/useTotalDays";
-import { Check, Lock, Play } from "lucide-react";
+import { Check, Lock, Play, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DayProgress {
@@ -26,32 +26,28 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [quizScore, setQuizScore] = useState({ total: 0, max: 0 });
 
   useEffect(() => {
     if (user) {
       fetchProgress();
-      if (profile?.referral_code) {
-        setReferralCode(profile.referral_code);
-      }
+      fetchQuizScores();
+      if (profile?.referral_code) setReferralCode(profile.referral_code);
     }
   }, [user, totalDays, profile]);
 
   const fetchProgress = async () => {
     try {
-      const { data: materials, error: materialsError } = await supabase
+      const { data: materials } = await supabase
         .from("course_materials")
         .select("id, day_number")
         .order("day_number")
         .order("order_index");
 
-      if (materialsError) throw materialsError;
-
-      const { data: progress, error: progressError } = await supabase
+      const { data: progress } = await supabase
         .from("user_progress")
         .select("material_id")
         .eq("user_id", user?.id);
-
-      if (progressError) throw progressError;
 
       const completedIds = new Set(progress?.map((p) => p.material_id) || []);
 
@@ -73,7 +69,6 @@ export default function UserDashboard() {
         const isUnlocked = previousDayCompleted;
         const isCurrent = isUnlocked && !isCompleted && !foundCurrentDay;
         if (isCurrent) foundCurrentDay = true;
-
         days.push({ dayNumber: i, totalMaterials: total, completedMaterials: completed, isUnlocked, isCompleted, isCurrent });
       }
 
@@ -85,22 +80,38 @@ export default function UserDashboard() {
     }
   };
 
+  const fetchQuizScores = async () => {
+    try {
+      const { data } = await supabase
+        .from("quiz_submissions")
+        .select("score, max_score")
+        .eq("user_id", user?.id);
+
+      if (data) {
+        const total = data.reduce((sum, s) => sum + s.score, 0);
+        const max = data.reduce((sum, s) => sum + s.max_score, 0);
+        setQuizScore({ total, max });
+      }
+    } catch (error) {
+      console.error("Error fetching quiz scores:", error);
+    }
+  };
+
   const generateReferralCode = async () => {
     if (!user) return;
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ referral_code: code })
-      .eq("user_id", user.id);
+    const { error } = await supabase.from("profiles").update({ referral_code: code }).eq("user_id", user.id);
     if (!error) setReferralCode(code);
   };
 
   const copyReferralLink = () => {
-    const link = `${window.location.origin}/signup?ref=${referralCode}`;
+    const link = `${window.location.origin}/apply?ref=${referralCode}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const scorePercent = quizScore.max > 0 ? Math.round((quizScore.total / quizScore.max) * 100) : 0;
 
   return (
     <DashboardLayout>
@@ -109,9 +120,7 @@ export default function UserDashboard() {
           <h1 className="text-3xl font-bold text-foreground">
             Welcome, {profile?.full_name?.split(" ")[0] || "Student"}!
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Your {totalDays}-day English speaking journey
-          </p>
+          <p className="text-muted-foreground mt-1">Your {totalDays}-day English speaking journey</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -133,10 +142,11 @@ export default function UserDashboard() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Overall Progress</CardDescription>
-              <CardTitle className="text-3xl">
-                {Math.round((dayProgress.filter((d) => d.isCompleted).length / totalDays) * 100)}%
-              </CardTitle>
+              <CardDescription className="flex items-center gap-1">
+                <Trophy className="h-4 w-4" />Quiz Score
+              </CardDescription>
+              <CardTitle className="text-3xl">{scorePercent}%</CardTitle>
+              <CardDescription>{quizScore.total} / {quizScore.max} marks</CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -151,7 +161,7 @@ export default function UserDashboard() {
             {referralCode ? (
               <div className="flex items-center gap-2 flex-wrap">
                 <code className="bg-muted px-3 py-1 rounded text-sm flex-1 min-w-0 truncate">
-                  {window.location.origin}/signup?ref={referralCode}
+                  {window.location.origin}/apply?ref={referralCode}
                 </code>
                 <button
                   onClick={copyReferralLink}
@@ -186,42 +196,42 @@ export default function UserDashboard() {
                   day.isCompleted && "bg-success/5 border-success/30"
                 )}
               >
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 p-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Day {day.dayNumber}</CardTitle>
+                    <CardTitle className="text-base">Day {day.dayNumber}</CardTitle>
                     {day.isCompleted ? (
-                      <div className="h-6 w-6 rounded-full bg-success flex items-center justify-center">
-                        <Check className="h-4 w-4 text-success-foreground" />
+                      <div className="h-5 w-5 rounded-full bg-success flex items-center justify-center shrink-0">
+                        <Check className="h-3 w-3 text-success-foreground" />
                       </div>
                     ) : day.isCurrent ? (
-                      <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                      <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center shrink-0">
                         <Play className="h-3 w-3 text-primary-foreground fill-current" />
                       </div>
                     ) : !day.isUnlocked ? (
-                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center">
+                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
                         <Lock className="h-3 w-3 text-muted-foreground" />
                       </div>
                     ) : null}
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 pt-0">
                   {day.totalMaterials > 0 ? (
-                    <div className="space-y-2">
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="space-y-1">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary transition-all"
                           style={{ width: `${(day.completedMaterials / day.totalMaterials) * 100}%` }}
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {day.completedMaterials}/{day.totalMaterials} materials
+                        {day.completedMaterials}/{day.totalMaterials}
                       </p>
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground">No materials yet</p>
+                    <p className="text-xs text-muted-foreground">No materials</p>
                   )}
                   {day.isCurrent && (
-                    <Badge className="mt-2" variant="default">Current</Badge>
+                    <Badge className="mt-1 text-xs" variant="default">Current</Badge>
                   )}
                 </CardContent>
               </Card>

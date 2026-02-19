@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { signUp } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, BookOpen } from "lucide-react";
+import { Loader2, BookOpen, Eye, EyeOff } from "lucide-react";
 
 const SIGNUP_SOURCES = ["Instagram", "WhatsApp", "Friends", "Family Members", "YouTube", "Google Search", "Other"];
 
@@ -18,15 +17,15 @@ export default function Signup() {
   const referralCode = searchParams.get("ref") || "";
 
   const [formData, setFormData] = useState({
-    email: "",
     password: "",
     confirmPassword: "",
     fullName: "",
-    gender: "",
     place: "",
     whatsappNumber: "",
     signupSource: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -43,18 +42,17 @@ export default function Signup() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast({ title: "Password too short", description: "Password must be at least 6 characters long.", variant: "destructive" });
+    if (!formData.password.trim()) {
+      toast({ title: "Password required", description: "Please enter a password.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
 
     const result = await signUp(
-      formData.email,
+      formData.whatsappNumber,
       formData.password,
       formData.fullName,
-      formData.gender,
       formData.place,
       formData.whatsappNumber,
       referralCode,
@@ -63,9 +61,11 @@ export default function Signup() {
 
     if (result.success) {
       toast({ title: "Registration successful!", description: "You are now logged in." });
-      // Auto-login: sign in immediately
+      // Get the dummy email we created and sign in
+      const cleaned = formData.whatsappNumber.replace(/\s+/g, "").replace(/^\+/, "");
+      const dummyEmail = `${cleaned}@whatsapp.com`;
       const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email.toLowerCase(),
+        email: dummyEmail,
         password: formData.password,
       });
       if (!error) {
@@ -94,7 +94,7 @@ export default function Signup() {
           )}
         </div>
 
-        <Card className="border-border shadow-lg">
+        <Card className="border-border shadow-lg rounded-2xl">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Create Account</CardTitle>
             <CardDescription className="text-center">
@@ -104,57 +104,105 @@ export default function Signup() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="your@email.com" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required disabled={loading} />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" type="text" placeholder="John Doe" value={formData.fullName} onChange={(e) => handleChange("fullName", e.target.value)} required disabled={loading} />
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => handleChange("fullName", e.target.value)}
+                  required
+                  disabled={loading}
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
-                <Select value={formData.gender} onValueChange={(value) => handleChange("gender", value)} disabled={loading}>
-                  <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                <Label htmlFor="place">Place</Label>
+                <Input
+                  id="place"
+                  type="text"
+                  value={formData.place}
+                  onChange={(e) => handleChange("place", e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                <Input
+                  id="whatsappNumber"
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => handleChange("whatsappNumber", e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>How did you hear about us?</Label>
+                <Select value={formData.signupSource} onValueChange={(v) => handleChange("signupSource", v)} disabled={loading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {SIGNUP_SOURCES.map(source => (
+                      <SelectItem key={source} value={source}>{source}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="place">Place</Label>
-                <Input id="place" type="text" placeholder="City, Country" value={formData.place} onChange={(e) => handleChange("place", e.target.value)} required disabled={loading} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                <Input id="whatsappNumber" type="tel" placeholder="+1234567890" value={formData.whatsappNumber} onChange={(e) => handleChange("whatsappNumber", e.target.value)} required disabled={loading} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>How did you hear about us?</Label>
-                <RadioGroup value={formData.signupSource} onValueChange={(v) => handleChange("signupSource", v)} className="grid grid-cols-2 gap-2">
-                  {SIGNUP_SOURCES.map(source => (
-                    <div key={source} className="flex items-center space-x-2">
-                      <RadioGroupItem value={source} id={`source-${source}`} />
-                      <Label htmlFor={`source-${source}`} className="text-sm">{source}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} required disabled={loading} />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => handleChange("password", e.target.value)}
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={(e) => handleChange("confirmPassword", e.target.value)} required disabled={loading} />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
