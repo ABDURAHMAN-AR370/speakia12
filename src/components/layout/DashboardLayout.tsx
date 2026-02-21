@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </Button>
           <Link to="/" className="flex items-center gap-2 ml-2">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span className="font-bold">SPEAKAI</span>
+            <span className="font-bold">QURBA</span>
           </Link>
         </div>
       </header>
@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6 shrink-0">
               <Link to="/" className="flex items-center gap-2">
                 <BookOpen className="h-6 w-6 text-sidebar-primary" />
-                <span className="text-xl font-bold">SPEAKAI</span>
+                <span className="text-xl font-bold">QURBA</span>
               </Link>
             </div>
 
