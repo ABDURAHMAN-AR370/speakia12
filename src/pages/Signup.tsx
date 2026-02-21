@@ -104,13 +104,13 @@ export default function Signup() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="your@email.com" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required disabled={loading} />
+                <Label htmlFor="email">User id</Label>
+                <Input id="email" type="email" placeholder="Whatsappnumber@gmail.com" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required disabled={loading} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" type="text" placeholder="John Doe" value={formData.fullName} onChange={(e) => handleChange("fullName", e.target.value)} required disabled={loading} />
+                <Input id="fullName" type="text" placeholder="Ahmad" value={formData.fullName} onChange={(e) => handleChange("fullName", e.target.value)} required disabled={loading} />
               </div>
 
               <div className="space-y-2">
@@ -132,7 +132,7 @@ export default function Signup() {
 
               <div className="space-y-2">
                 <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                <Input id="whatsappNumber" type="tel" placeholder="+1234567890" value={formData.whatsappNumber} onChange={(e) => handleChange("whatsappNumber", e.target.value)} required disabled={loading} />
+                <Input id="whatsappNumber" type="tel" placeholder="1234567890" value={formData.whatsappNumber} onChange={(e) => handleChange("whatsappNumber", e.target.value)} required disabled={loading} />
               </div>
 
               <div className="space-y-2">
