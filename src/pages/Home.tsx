@@ -33,7 +33,7 @@ export default function Home() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">Qurba Course</span>
+            <span className="text-xl font-bold">Qurba</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login">
@@ -55,7 +55,7 @@ export default function Home() {
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Why Choose Speakai?</h2>
+            <h2 className="text-3xl font-bold mb-4">Why Choose Qurba</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our AI-powered English course is designed to help you master fluent
               speaking skills through structured daily lessons and interactive content.
@@ -88,6 +88,9 @@ export default function Home() {
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Learning?</h2>
+          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+            Join in Qurba course
+          </p>
           <div className="flex gap-4 justify-center">
             <Link to="/signup">
               <Button size="lg">Start Your Journey</Button>
