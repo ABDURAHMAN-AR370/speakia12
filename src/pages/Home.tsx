@@ -20,11 +20,6 @@ export default function Home() {
     icon: Award,
     title: "Track Progress",
     description: "Monitor your learning journey with quizzes and progress tracking"
-  },
-  {
-    icon: CheckCircle,
-    title: "Practical Skills",
-    description: "Focus on real-world English speaking and communication skills"
   }];
 
 
