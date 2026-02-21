@@ -230,24 +230,24 @@ export default function Login() {
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
-          <p className="text-muted-foreground mt-2">AI-Powered English Speaking Course</p>
+          <p className="text-muted-foreground mt-2">Quran course</p>
         </div>
 
         <Card className="border-border shadow-lg">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign In</CardTitle>
             <CardDescription className="text-center">
-              Enter your email or WhatsApp number to sign in
+              Enter your user id
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="identifier">Email or WhatsApp Number</Label>
+                <Label htmlFor="identifier">User id</Label>
                 <Input
                   id="identifier"
                   type="text"
-                  placeholder="your@email.com or +91..."
+                  placeholder="whatsappnumebr@email.com"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
