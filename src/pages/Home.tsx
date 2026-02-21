@@ -9,7 +9,7 @@ export default function Home() {
   {
     icon: BookOpen,
     title: "Structured Learning",
-    description: "30-day comprehensive course with daily materials, videos, and exercises"
+    description: "10-day comprehensive course with daily materials, videos, and exercises"
   },
   {
     icon: Users,
