@@ -2,26 +2,29 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import HeroCarousel from "@/components/HeroCarousel";
-import { BookOpen, Users, Award, CheckCircle } from "lucide-react";
+import { BookOpen, Users, Award } from "lucide-react";
 
 export default function Home() {
   const features = [
-  {
-    icon: BookOpen,
-    title: "Structured Learning",
-    description: "10-day comprehensive course with daily materials, videos, and exercises"
-  },
-  {
-    icon: Users,
-    title: "Expert Guidance",
-    description: "Learn from experienced instructors with proven teaching methods"
-  },
-  {
-    icon: Award,
-    title: "Track Progress",
-    description: "Monitor your learning journey with quizzes and progress tracking"
-  }];
-
+    {
+      icon: BookOpen,
+      title: "Structured Learning",
+      description:
+        "10-day comprehensive course with daily materials, videos, and exercises",
+    },
+    {
+      icon: Users,
+      title: "Expert Guidance",
+      description:
+        "Learn from experienced instructors with proven teaching methods",
+    },
+    {
+      icon: Award,
+      title: "Track Progress",
+      description:
+        "Monitor your learning journey with quizzes and progress tracking",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,9 +62,13 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) =>
-            <Card key={index} className="border-none shadow-lg">
+          {/* Centered 3 Cards */}
+          <div className="flex flex-wrap justify-center gap-6">
+            {features.map((feature, index) => (
+              <Card
+                key={index}
+                className="w-full sm:w-[300px] border-none shadow-lg"
+              >
                 <CardContent className="pt-6 text-center">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
                     <feature.icon className="h-6 w-6 text-primary" />
@@ -72,7 +79,7 @@ export default function Home() {
                   </p>
                 </CardContent>
               </Card>
-            )}
+            ))}
           </div>
         </div>
       </section>
@@ -87,9 +94,7 @@ export default function Home() {
           </p>
           <div className="flex gap-4 justify-center">
             <Link to="/signup">
-              <Button size="lg">
-                Start Your Journey
-              </Button>
+              <Button size="lg">Start Your Journey</Button>
             </Link>
             <Link to="/login">
               <Button size="lg" variant="outline">
@@ -112,6 +117,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </div>);
-
+    </div>
+  );
 }
