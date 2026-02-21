@@ -88,10 +88,6 @@ export default function Home() {
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Learning?</h2>
-          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-            Join thousands of learners who have improved their English speaking
-            skills with our comprehensive course.
-          </p>
           <div className="flex gap-4 justify-center">
             <Link to="/signup">
               <Button size="lg">Start Your Journey</Button>
