@@ -6,27 +6,27 @@ import { BookOpen, Users, Award, CheckCircle } from "lucide-react";
 
 export default function Home() {
   const features = [
-    {
-      icon: BookOpen,
-      title: "Structured Learning",
-      description: "30-day comprehensive course with daily materials, videos, and exercises",
-    },
-    {
-      icon: Users,
-      title: "Expert Guidance",
-      description: "Learn from experienced instructors with proven teaching methods",
-    },
-    {
-      icon: Award,
-      title: "Track Progress",
-      description: "Monitor your learning journey with quizzes and progress tracking",
-    },
-    {
-      icon: CheckCircle,
-      title: "Practical Skills",
-      description: "Focus on real-world English speaking and communication skills",
-    },
-  ];
+  {
+    icon: BookOpen,
+    title: "Structured Learning",
+    description: "30-day comprehensive course with daily materials, videos, and exercises"
+  },
+  {
+    icon: Users,
+    title: "Expert Guidance",
+    description: "Learn from experienced instructors with proven teaching methods"
+  },
+  {
+    icon: Award,
+    title: "Track Progress",
+    description: "Monitor your learning journey with quizzes and progress tracking"
+  },
+  {
+    icon: CheckCircle,
+    title: "Practical Skills",
+    description: "Focus on real-world English speaking and communication skills"
+  }];
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -35,7 +35,7 @@ export default function Home() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">SPEAKAI</span>
+            <span className="text-xl font-bold">Qurba Course</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login">
@@ -57,7 +57,7 @@ export default function Home() {
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Why Choose SPEAKAI?</h2>
+            <h2 className="text-3xl font-bold mb-4">Why Choose Speakai?</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our AI-powered English course is designed to help you master fluent
               speaking skills through structured daily lessons and interactive content.
@@ -65,8 +65,8 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
-              <Card key={index} className="border-none shadow-lg">
+            {features.map((feature, index) =>
+            <Card key={index} className="border-none shadow-lg">
                 <CardContent className="pt-6 text-center">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
                     <feature.icon className="h-6 w-6 text-primary" />
@@ -77,7 +77,7 @@ export default function Home() {
                   </p>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -117,6 +117,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
