@@ -105,10 +105,10 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <div className="flex items-center justify-center gap-2 mb-4">
             <BookOpen className="h-5 w-5" />
-            <span className="font-semibold">SPEAKAI</span>
+            <span className="font-semibold">Qurba</span>
           </div>
           <p className="text-sm">
-            © {new Date().getFullYear()} SPEAKAI. AI-Powered English Speaking Course.
+            © {new Date().getFullYear()} Qurba. Presented by Quriosity podcast.
           </p>
         </div>
       </footer>
