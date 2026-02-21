@@ -163,7 +163,7 @@ export default function Login() {
 
   const handleForgotPassword = () => {
     window.open(
-      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(`Hi, I forgot my SPEAKAI password. My email/number: ${identifier}. Please reset my password.`)}`,
+      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(`Hi, I forgot my Qurba website password. My email/number: ${identifier}. Please reset my password.`)}`,
       "_blank"
     );
   };
@@ -176,7 +176,7 @@ export default function Login() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
               <BookOpen className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground">SPEAKAI</h1>
+            <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
             <p className="text-muted-foreground mt-2">Set your new password</p>
           </div>
           <Card className="border-border shadow-lg">
@@ -229,7 +229,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">SPEAKAI</h1>
+          <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
           <p className="text-muted-foreground mt-2">AI-Powered English Speaking Course</p>
         </div>
 
