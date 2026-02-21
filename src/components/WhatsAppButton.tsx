@@ -5,7 +5,7 @@ const ADMIN_WHATSAPP = "917593879279";
 export default function WhatsAppButton() {
   const handleClick = () => {
     window.open(
-      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent("Hi, I need help with SPEAKAI course.")}`,
+      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent("Hi, I need help with Qurba course.")}`,
       "_blank"
     );
   };
