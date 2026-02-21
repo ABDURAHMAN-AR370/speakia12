@@ -56,10 +56,6 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Why Choose Qurba</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our AI-powered English course is designed to help you master fluent
-              speaking skills through structured daily lessons and interactive content.
-            </p>
           </div>
 
           {/* Centered 3 Cards */}
