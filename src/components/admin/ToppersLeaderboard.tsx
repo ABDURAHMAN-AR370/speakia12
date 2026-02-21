@@ -81,7 +81,7 @@ export default function ToppersLeaderboard({ batchNumber, toppers }: ToppersLead
       <CardContent>
         <div ref={leaderboardRef} className="p-4 bg-background rounded-lg">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-foreground">SPEAKAI - Batch {batchNumber}</h2>
+            <h2 className="text-xl font-bold text-foreground">Qurba - Batch {batchNumber}</h2>
             <p className="text-sm text-muted-foreground">Top Performers Leaderboard</p>
           </div>
           
