@@ -86,11 +86,8 @@ export default function HeroCarousel() {
       <div className="relative h-[70vh] bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
         <div className="text-center space-y-4 px-4">
           <h1 className="text-4xl md:text-6xl font-bold text-foreground">
-            Welcome to SPEAKAI
+            Welcome to Qurba
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-            AI-Powered English Speaking Course - Master Fluent English with Confidence
-          </p>
         </div>
       </div>
     );
