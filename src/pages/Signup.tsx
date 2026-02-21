@@ -88,7 +88,7 @@ export default function Signup() {
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
-          <p className="text-muted-foreground mt-2">AI-Powered English Speaking Course</p>
+          <p className="text-muted-foreground mt-2">Quran Course</p>
           {referralCode && (
             <p className="text-sm text-primary mt-1">Referred by a friend 🎉</p>
           )}
