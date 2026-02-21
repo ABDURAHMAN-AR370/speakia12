@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, ShieldBan, ShieldCheck, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, KeyRound } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
@@ -22,7 +22,6 @@ import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
 interface WhitelistEntry {
   id: string;
   email: string;
-  phone_number: string | null;
   batch_number: number;
   created_at: string;
   password_reset_enabled: boolean;
@@ -40,13 +39,10 @@ interface UserProfile {
   created_at: string;
   referred_by: string | null;
   signup_source: string | null;
-  is_blocked: boolean;
 }
 
 interface CompletionData { user_id: string; day_number: number; completed_at: string; }
 interface TopperData { user_id: string; full_name: string; total_score: number; max_possible: number; percentage: number; quizzes_taken: number; }
-
-type SortField = "name" | "batch" | "status";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -58,20 +54,19 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
-  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newBatch, setNewBatch] = useState("1");
-  const [bulkPhones, setBulkPhones] = useState("");
+  const [bulkEmails, setBulkEmails] = useState("");
   const [bulkBatch, setBulkBatch] = useState("1");
   const [adding, setAdding] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("batches");
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortAsc, setSortAsc] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<"all" | "registered" | "pending" | "blocked">("all");
-  const [filterBatch, setFilterBatch] = useState<string>("all");
 
   useEffect(() => { fetchData(); }, []);
-  useEffect(() => { if (selectedBatch) fetchBatchData(selectedBatch); }, [selectedBatch]);
+
+  useEffect(() => {
+    if (selectedBatch) fetchBatchData(selectedBatch);
+  }, [selectedBatch]);
 
   const fetchData = async () => {
     try {
@@ -147,46 +142,32 @@ export default function AdminUsers() {
     }
   };
 
-  const handleAddPhone = async () => {
-    if (!newPhone.trim()) return;
+  const handleAddEmail = async () => {
+    if (!newEmail.trim()) return;
     setAdding(true);
-    const cleaned = newPhone.replace(/\s+/g, "").replace(/^\+/, "");
-    const dummyEmail = `${cleaned}@whatsapp.com`;
     try {
-      const { error } = await supabase.from("whitelist").insert({
-        email: dummyEmail,
-        phone_number: cleaned,
-        batch_number: parseInt(newBatch),
-        added_by: user?.id,
-      });
+      const { error } = await supabase.from("whitelist").insert({ email: newEmail.toLowerCase().trim(), batch_number: parseInt(newBatch), added_by: user?.id });
       if (error) throw error;
-      toast({ title: "Phone number added to whitelist" });
-      setNewPhone(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
+      toast({ title: "Email added to whitelist" });
+      setNewEmail(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
     } catch (error: unknown) {
-      toast({ title: "Failed to add phone", description: (error as { message?: string }).message, variant: "destructive" });
+      toast({ title: "Failed to add email", description: (error as { message?: string }).message, variant: "destructive" });
     } finally {
       setAdding(false);
     }
   };
 
   const handleBulkAdd = async () => {
-    const phones = bulkPhones.split(/[\n,;]/).map(p => p.replace(/\s+/g, "").replace(/^\+/, "")).filter(p => p.length > 5);
-    if (phones.length === 0) { toast({ title: "No valid phone numbers found", variant: "destructive" }); return; }
+    const emails = bulkEmails.split(/[\n,;]/).map(e => e.toLowerCase().trim()).filter(e => e && e.includes("@"));
+    if (emails.length === 0) { toast({ title: "No valid emails found", variant: "destructive" }); return; }
     setAdding(true);
     try {
-      const { error } = await supabase.from("whitelist").insert(
-        phones.map(phone => ({
-          email: `${phone}@whatsapp.com`,
-          phone_number: phone,
-          batch_number: parseInt(bulkBatch),
-          added_by: user?.id,
-        }))
-      );
+      const { error } = await supabase.from("whitelist").insert(emails.map(email => ({ email, batch_number: parseInt(bulkBatch), added_by: user?.id })));
       if (error) throw error;
-      toast({ title: `${phones.length} phone numbers added to whitelist` });
-      setBulkPhones(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
+      toast({ title: `${emails.length} emails added to whitelist` });
+      setBulkEmails(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
     } catch (error: unknown) {
-      toast({ title: "Failed to add phones", description: (error as { message?: string }).message, variant: "destructive" });
+      toast({ title: "Failed to add emails", description: (error as { message?: string }).message, variant: "destructive" });
     } finally {
       setAdding(false);
     }
@@ -196,9 +177,9 @@ export default function AdminUsers() {
     try {
       const { error } = await supabase.from("whitelist").delete().eq("id", id);
       if (error) throw error;
-      toast({ title: "Removed from whitelist" }); fetchData();
+      toast({ title: "Email removed from whitelist" }); fetchData();
     } catch {
-      toast({ title: "Failed to remove", variant: "destructive" });
+      toast({ title: "Failed to remove email", variant: "destructive" });
     }
   };
 
@@ -213,36 +194,6 @@ export default function AdminUsers() {
     }
   };
 
-  const handleToggleBlock = async (userId: string, currentBlocked: boolean) => {
-    try {
-      const { error } = await supabase.from("profiles").update({ is_blocked: !currentBlocked }).eq("user_id", userId);
-      if (error) throw error;
-      toast({ title: currentBlocked ? "User unblocked" : "User blocked" });
-      fetchData();
-    } catch {
-      toast({ title: "Failed to update", variant: "destructive" });
-    }
-  };
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) setSortAsc(!sortAsc);
-    else { setSortField(field); setSortAsc(true); }
-  };
-
-  const sortedUsers = [...users].filter(u => {
-    const isRegistered = !u.is_blocked;
-    if (filterStatus === "blocked") return u.is_blocked;
-    if (filterStatus === "registered") return !u.is_blocked;
-    if (filterBatch !== "all") return u.batch_number === parseInt(filterBatch);
-    return true;
-  }).sort((a, b) => {
-    let cmp = 0;
-    if (sortField === "name") cmp = a.full_name.localeCompare(b.full_name);
-    if (sortField === "batch") cmp = a.batch_number - b.batch_number;
-    if (sortField === "status") cmp = Number(a.is_blocked) - Number(b.is_blocked);
-    return sortAsc ? cmp : -cmp;
-  });
-
   const batchInfo = users.reduce((acc, user) => {
     const batch = user.batch_number || 1;
     const existing = acc.find(b => b.batchNumber === batch);
@@ -253,7 +204,6 @@ export default function AdminUsers() {
   batchInfo.sort((a, b) => a.batchNumber - b.batchNumber);
 
   const selectedBatchStudents = users.filter(u => u.batch_number === selectedBatch);
-  const uniqueBatches = [...new Set(users.map(u => u.batch_number))].sort();
 
   return (
     <DashboardLayout>
@@ -261,14 +211,14 @@ export default function AdminUsers() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-            <p className="text-muted-foreground mt-1">Manage whitelist, batches, and user access</p>
+            <p className="text-muted-foreground mt-1">Manage whitelist, batches, and view user progress</p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <Button variant="outline" size="sm" onClick={() => setShowBulkDialog(true)} className="flex-1 sm:flex-none">
               <Upload className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Bulk Import</span>
             </Button>
             <Button size="sm" onClick={() => setShowAddDialog(true)} className="flex-1 sm:flex-none">
-              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add Phone</span>
+              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add Email</span>
             </Button>
           </div>
         </div>
@@ -276,7 +226,6 @@ export default function AdminUsers() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="batches">Batches</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="whitelist">Whitelist</TabsTrigger>
           </TabsList>
 
@@ -299,117 +248,22 @@ export default function AdminUsers() {
             )}
           </TabsContent>
 
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Registered Users</CardTitle>
-                    <CardDescription>{sortedUsers.length} users</CardDescription>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <Select value={filterBatch} onValueChange={setFilterBatch}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Batch" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Batches</SelectItem>
-                        {uniqueBatches.map(b => (
-                          <SelectItem key={b} value={b.toString()}>Batch {b}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="registered">Active</SelectItem>
-                        <SelectItem value="blocked">Blocked</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-8">Loading...</div>
-                ) : sortedUsers.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No users found</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>
-                          <Button variant="ghost" size="sm" onClick={() => handleSort("name")} className="gap-1 -ml-2">
-                            Name <ArrowUpDown className="h-3 w-3" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>
-                          <Button variant="ghost" size="sm" onClick={() => handleSort("batch")} className="gap-1 -ml-2">
-                            Batch <ArrowUpDown className="h-3 w-3" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button variant="ghost" size="sm" onClick={() => handleSort("status")} className="gap-1 -ml-2">
-                            Status <ArrowUpDown className="h-3 w-3" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-center">Block</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedUsers.map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.full_name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{u.whatsapp_number}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">Batch {u.batch_number}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={u.is_blocked ? "destructive" : "default"}>
-                              {u.is_blocked ? "Blocked" : "Active"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleToggleBlock(u.user_id, u.is_blocked)}
-                              title={u.is_blocked ? "Unblock user" : "Block user"}
-                            >
-                              {u.is_blocked
-                                ? <ShieldCheck className="h-4 w-4 text-green-600" />
-                                : <ShieldBan className="h-4 w-4 text-destructive" />}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="whitelist">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Phone Whitelist</CardTitle>
-                <CardDescription>Only whitelisted phone numbers can register. Toggle 🔑 to enable password reset.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Email Whitelist</CardTitle>
+                <CardDescription>Only whitelisted emails can register. Toggle 🔑 to enable password reset.</CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 {loading ? (
                   <div className="text-center py-8">Loading...</div>
                 ) : whitelist.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No phone numbers in whitelist yet</div>
+                  <div className="text-center py-8 text-muted-foreground">No emails in whitelist yet</div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Phone / Email</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead className="hidden sm:table-cell">Batch</TableHead>
                         <TableHead className="hidden sm:table-cell">Status</TableHead>
                         <TableHead className="text-center">🔑 Reset</TableHead>
@@ -418,11 +272,10 @@ export default function AdminUsers() {
                     </TableHeader>
                     <TableBody>
                       {whitelist.map((entry) => {
-                        const isRegistered = users.some(u => u.email === entry.email || u.whatsapp_number === entry.phone_number);
-                        const displayId = entry.phone_number || entry.email;
+                        const isRegistered = users.some(u => u.email === entry.email);
                         return (
                           <TableRow key={entry.id}>
-                            <TableCell className="font-medium text-sm">{displayId}</TableCell>
+                            <TableCell className="font-medium text-sm">{entry.email}</TableCell>
                             <TableCell className="hidden sm:table-cell">
                               <Badge variant="outline">Batch {entry.batch_number || 1}</Badge>
                             </TableCell>
@@ -453,17 +306,17 @@ export default function AdminUsers() {
           </TabsContent>
         </Tabs>
 
-        {/* Add Single Phone Dialog */}
+        {/* Add Single Email Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent className="rounded-2xl">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Phone to Whitelist</DialogTitle>
-              <DialogDescription>This phone number will be able to register for the course</DialogDescription>
+              <DialogTitle>Add Email to Whitelist</DialogTitle>
+              <DialogDescription>This email will be able to register for the course</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">WhatsApp Number</Label>
-                <Input id="phone" type="tel" placeholder="91XXXXXXXXXX" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+                <Label htmlFor="email">Email Address</Label>
+                <Input id="email" type="email" placeholder="user@example.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="batch">Batch Number</Label>
@@ -479,8 +332,8 @@ export default function AdminUsers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddPhone} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Phone
+              <Button onClick={handleAddEmail} disabled={adding}>
+                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Email
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -488,10 +341,10 @@ export default function AdminUsers() {
 
         {/* Bulk Import Dialog */}
         <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-          <DialogContent className="rounded-2xl">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Bulk Import Phone Numbers</DialogTitle>
-              <DialogDescription>Paste multiple numbers (one per line or separated by commas)</DialogDescription>
+              <DialogTitle>Bulk Import Emails</DialogTitle>
+              <DialogDescription>Paste multiple emails (separated by commas, semicolons, or new lines)</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -506,14 +359,14 @@ export default function AdminUsers() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bulkPhones">Phone Numbers</Label>
-                <Textarea id="bulkPhones" placeholder={"917594000000\n916000000000"} value={bulkPhones} onChange={(e) => setBulkPhones(e.target.value)} rows={6} />
+                <Label htmlFor="bulkEmails">Email Addresses</Label>
+                <Textarea id="bulkEmails" placeholder={"user1@example.com\nuser2@example.com"} value={bulkEmails} onChange={(e) => setBulkEmails(e.target.value)} rows={6} />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
               <Button onClick={handleBulkAdd} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import
+                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Emails
               </Button>
             </DialogFooter>
           </DialogContent>

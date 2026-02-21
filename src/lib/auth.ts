@@ -14,9 +14,23 @@ export interface UserProfile {
   referral_code: string | null;
   referred_by: string | null;
   signup_source: string | null;
-  is_blocked: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export async function checkEmailWhitelisted(email: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("whitelist")
+    .select("id")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  
+  if (error) {
+    console.error("Error checking whitelist:", error);
+    return false;
+  }
+  
+  return !!data;
 }
 
 export async function getUserRole(userId: string): Promise<UserRole | null> {
@@ -50,33 +64,29 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 export async function signUp(
-  phoneNumber: string,
+  email: string,
   password: string,
   fullName: string,
+  gender: string,
   place: string,
   whatsappNumber: string,
   referredBy?: string,
   signupSource?: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Clean the phone number and create a dummy email
-  const cleaned = phoneNumber.replace(/\s+/g, "").replace(/^\+/, "");
-  const dummyEmail = `${cleaned}@whatsapp.com`;
-
-  // Check if phone number is in whitelist (check by phone_number column OR email legacy)
   const { data: whitelistData, error: whitelistError } = await supabase
     .from("whitelist")
-    .select("id, batch_number, phone_number, email")
-    .or(`phone_number.eq.${cleaned},phone_number.eq.${phoneNumber},email.eq.${dummyEmail}`)
+    .select("id, batch_number")
+    .eq("email", email.toLowerCase())
     .maybeSingle();
 
   if (whitelistError || !whitelistData) {
-    return { success: false, error: "Your phone number is not authorized to register. Please contact the administrator." };
+    return { success: false, error: "Your email is not authorized to register. Please contact the administrator." };
   }
 
   const batchNumber = whitelistData.batch_number || 1;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: dummyEmail,
+    email: email.toLowerCase(),
     password,
     options: {
       emailRedirectTo: window.location.origin,
@@ -93,11 +103,11 @@ export async function signUp(
 
   const { error: profileError } = await supabase.from("profiles").insert({
     user_id: authData.user.id,
-    email: dummyEmail,
+    email: email.toLowerCase(),
     full_name: fullName,
-    gender: "other",
+    gender,
     place,
-    whatsapp_number: cleaned,
+    whatsapp_number: whatsappNumber,
     batch_number: batchNumber,
     referred_by: referredBy || null,
     signup_source: signupSource || null,
