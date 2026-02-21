@@ -66,7 +66,7 @@ export default function Login() {
     if (!email) {
       toast({
         title: "Account not found",
-        description: "No account found with this email or WhatsApp number.",
+        description: "No account found with this user id. click on whatsapp icon to conatact mentor",
         variant: "destructive",
       });
       setLoading(false);
@@ -237,7 +237,7 @@ export default function Login() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign In</CardTitle>
             <CardDescription className="text-center">
-              Enter your user id
+              Enter your user id & password
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -247,7 +247,7 @@ export default function Login() {
                 <Input
                   id="identifier"
                   type="text"
-                  placeholder="whatsappnumebr@email.com"
+                  placeholder="whatsappnumebr@gmail.com"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
