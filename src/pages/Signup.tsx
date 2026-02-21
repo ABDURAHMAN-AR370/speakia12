@@ -87,7 +87,7 @@ export default function Signup() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <BookOpen className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">SPEAKAI</h1>
+          <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
           <p className="text-muted-foreground mt-2">AI-Powered English Speaking Course</p>
           {referralCode && (
             <p className="text-sm text-primary mt-1">Referred by a friend 🎉</p>
