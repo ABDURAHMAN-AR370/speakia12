@@ -22,6 +22,19 @@ interface MaterialViewerProps {
   onComplete: () => void;
 }
 
+function getEmbedUrl(url: string): string {
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  // Vimeo
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  // Google Drive
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+  return url;
+}
+
 export default function MaterialViewer({ material, isCompleted, onClose, onComplete }: MaterialViewerProps) {
   const isFormOrQuiz = material.material_type === "form" || material.material_type === "quiz" || !!material.form_id || !!material.quiz_id;
   const minTime = material.min_completion_time || 0;
@@ -68,11 +81,13 @@ export default function MaterialViewer({ material, isCompleted, onClose, onCompl
           <p className="text-muted-foreground text-center py-8">No image available</p>
         );
       case "video":
-        return material.material_url ? (
-          <video src={material.material_url} controls className="w-full max-h-[400px] rounded-lg" />
-        ) : (
-          <p className="text-muted-foreground text-center py-8">No video available</p>
-        );
+        if (!material.material_url) return <p className="text-muted-foreground text-center py-8">No video available</p>;
+        // Detect YouTube/Vimeo links and use iframe
+        if (material.material_url.match(/youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|drive\.google\.com/i)) {
+          const embedUrl = getEmbedUrl(material.material_url);
+          return <iframe src={embedUrl} className="w-full aspect-video rounded-lg" allowFullScreen allow="autoplay; encrypted-media" />;
+        }
+        return <video src={material.material_url} controls className="w-full max-h-[400px] rounded-lg" />;
       case "audio":
         return material.material_url ? (
           <div className="py-8"><audio src={material.material_url} controls className="w-full" /></div>

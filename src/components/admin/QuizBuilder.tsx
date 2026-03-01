@@ -117,6 +117,24 @@ export default function QuizBuilder({ quiz, onClose, onSuccess }: QuizBuilderPro
       return;
     }
 
+    // Validate MCQ: all 4 options must be filled and correct answer must be selected
+    const invalidMcq = questions.filter(
+      (q) => q.type === "mcq" && (
+        !q.options || q.options.length < 4 || q.options.some(o => !o.trim()) || !q.correctAnswer || !(q.options.includes(q.correctAnswer as string))
+      )
+    );
+    if (invalidMcq.length > 0) {
+      toast({ title: "All MCQ questions must have 4 options filled and a correct answer selected", variant: "destructive" });
+      return;
+    }
+
+    // Validate True/False: correct answer must be selected
+    const invalidTF = questions.filter(q => q.type === "true_false" && (!q.correctAnswer || !["True", "False"].includes(q.correctAnswer as string)));
+    if (invalidTF.length > 0) {
+      toast({ title: "All True/False questions must have a correct answer selected", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const quizData = {

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -43,6 +44,7 @@ export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDa
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     day_number: editingMaterial?.day_number?.toString() || defaultDay?.toString() || "1",
     work_type: editingMaterial?.work_type || "",
@@ -76,18 +78,37 @@ export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDa
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadProgress(0);
+
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // Simulate progress for large files
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) { clearInterval(progressInterval); return 90; }
+          return prev + Math.random() * 15;
+        });
+      }, 500);
+
       const { error: uploadError } = await supabase.storage.from("course-materials").upload(`materials/${fileName}`, file);
+
+      clearInterval(progressInterval);
+
       if (uploadError) throw uploadError;
+
+      setUploadProgress(100);
       const { data: urlData } = supabase.storage.from("course-materials").getPublicUrl(`materials/${fileName}`);
       handleChange("material_url", urlData.publicUrl);
       toast({ title: "File uploaded successfully" });
     } catch {
       toast({ title: "Upload failed", variant: "destructive" });
     } finally {
-      setUploading(false);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 500);
     }
   };
 
@@ -178,12 +199,12 @@ export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDa
 
           <div className="space-y-2">
             <Label>Work Type / Title</Label>
-            <Input placeholder="e.g., Vocabulary Practice" value={formData.work_type} onChange={(e) => handleChange("work_type", e.target.value)} />
+            <Input value={formData.work_type} onChange={(e) => handleChange("work_type", e.target.value)} />
           </div>
 
           <div className="space-y-2">
             <Label>Details / Description</Label>
-            <Textarea placeholder="Describe the material..." value={formData.details} onChange={(e) => handleChange("details", e.target.value)} rows={3} />
+            <Textarea value={formData.details} onChange={(e) => handleChange("details", e.target.value)} rows={3} />
           </div>
 
           <div className="space-y-2">
@@ -205,9 +226,14 @@ export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDa
             <div className="space-y-2">
               <Label>{formData.material_type === "link" ? "URL *" : "Upload or URL *"}</Label>
               {formData.material_type !== "link" && (
-                <div className="mb-2">
+                <div className="mb-2 space-y-2">
                   <Input type="file" accept={formData.material_type === "image" ? "image/*" : formData.material_type === "video" ? "video/*" : formData.material_type === "audio" ? "audio/*" : "*"} onChange={handleFileUpload} disabled={uploading} />
-                  {uploading && <p className="text-sm text-muted-foreground mt-1">Uploading...</p>}
+                  {uploading && (
+                    <div className="space-y-1">
+                      <Progress value={uploadProgress} className="h-2" />
+                      <p className="text-xs text-muted-foreground">{Math.round(uploadProgress)}% uploaded</p>
+                    </div>
+                  )}
                 </div>
               )}
               <Input placeholder="https://..." value={formData.material_url} onChange={(e) => handleChange("material_url", e.target.value)} />
@@ -251,7 +277,6 @@ export default function AddMaterialDialog({ defaultDay, editingMaterial, totalDa
             <Input
               type="number"
               min="0"
-              placeholder="0 = no minimum"
               value={formData.min_completion_time}
               onChange={(e) => handleChange("min_completion_time", e.target.value)}
             />

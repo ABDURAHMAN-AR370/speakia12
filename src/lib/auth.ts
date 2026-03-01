@@ -18,11 +18,13 @@ export interface UserProfile {
   updated_at: string;
 }
 
-export async function checkEmailWhitelisted(email: string): Promise<boolean> {
+export async function checkPhoneWhitelisted(phone: string): Promise<boolean> {
+  const cleaned = phone.replace(/\s+/g, "").replace(/^\+/, "");
+  const email = `${cleaned}@qurba.app`;
   const { data, error } = await supabase
     .from("whitelist")
     .select("id")
-    .eq("email", email.toLowerCase())
+    .eq("email", email)
     .maybeSingle();
   
   if (error) {
@@ -80,7 +82,7 @@ export async function signUp(
     .maybeSingle();
 
   if (whitelistError || !whitelistData) {
-    return { success: false, error: "Your email is not authorized to register. Please contact the administrator." };
+    return { success: false, error: "Your number is not authorized to register. Please contact the administrator." };
   }
 
   const batchNumber = whitelistData.batch_number || 1;
