@@ -227,13 +227,13 @@ export default function Login() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign In</CardTitle>
             <CardDescription className="text-center">
-              Enter your WhatsApp number & password
+              Enter your User ID & password
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="identifier">WhatsApp Number</Label>
+                <Label htmlFor="identifier">User ID</Label>
                 <Input
                   id="identifier"
                   type="tel"
