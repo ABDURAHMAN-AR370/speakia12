@@ -60,11 +60,10 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
 
     setResults({ score, maxScore, details });
     setShowResults(true);
-  };
 
-  const handleFinalSubmit = async () => {
+    // Auto-submit after grading
     setLoading(true);
-    await onSubmit(answers, results.score, results.maxScore);
+    await onSubmit(answers, score, maxScore);
     setLoading(false);
   };
 
@@ -153,13 +152,9 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
           <Button variant="outline" onClick={onClose} disabled={loading}>
             {showResults ? "Close" : "Cancel"}
           </Button>
-          {!showResults ? (
-            <Button onClick={handleSubmit}>
-              Check Answers
-            </Button>
-          ) : (
-            <Button onClick={handleFinalSubmit} disabled={loading}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : "Submit & Complete"}
+          {!showResults && (
+            <Button onClick={handleSubmit} disabled={loading}>
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : "Submit Quiz"}
             </Button>
           )}
         </DialogFooter>

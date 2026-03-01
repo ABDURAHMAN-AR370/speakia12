@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, KeyRound } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
@@ -22,6 +22,7 @@ import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
 interface WhitelistEntry {
   id: string;
   email: string;
+  phone_number: string | null;
   batch_number: number;
   created_at: string;
   password_reset_enabled: boolean;
@@ -54,9 +55,14 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editBatch, setEditBatch] = useState("1");
+  const [editFullName, setEditFullName] = useState("");
+  const [editPlace, setEditPlace] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [newBatch, setNewBatch] = useState("1");
-  const [bulkEmails, setBulkEmails] = useState("");
+  const [bulkPhones, setBulkPhones] = useState("");
   const [bulkBatch, setBulkBatch] = useState("1");
   const [adding, setAdding] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
@@ -120,9 +126,14 @@ export default function AdminUsers() {
       });
       setCompletions(dayCompletions);
 
-      const { data: quizSubmissions } = await supabase.from("quiz_submissions").select("user_id, score, max_score").in("user_id", userIds);
+      // Fetch quiz submissions - only for materials that still exist
+      const existingMaterialIds = new Set(materialsData?.map(m => m.id) || []);
+      const { data: quizSubmissions } = await supabase.from("quiz_submissions").select("user_id, score, max_score, material_id").in("user_id", userIds);
+      
       const userScores = new Map<string, { total: number; max: number; count: number }>();
       quizSubmissions?.forEach(sub => {
+        // Only count if the material still exists
+        if (!existingMaterialIds.has(sub.material_id)) return;
         if (!userScores.has(sub.user_id)) userScores.set(sub.user_id, { total: 0, max: 0, count: 0 });
         const scores = userScores.get(sub.user_id)!;
         scores.total += sub.score; scores.max += sub.max_score; scores.count++;
@@ -135,39 +146,42 @@ export default function AdminUsers() {
           toppersList.push({ user_id: userId, full_name: userProfile.full_name, total_score: scores.total, max_possible: scores.max, percentage: (scores.total / scores.max) * 100, quizzes_taken: scores.count });
         }
       });
-      toppersList.sort((a, b) => b.percentage - a.percentage);
-      setToppers(toppersList.slice(0, 10));
+      // Sort by total score (highest first)
+      toppersList.sort((a, b) => b.total_score - a.total_score);
+      setToppers(toppersList);
     } catch (error) {
       console.error("Error fetching batch data:", error);
     }
   };
 
-  const handleAddEmail = async () => {
-    if (!newEmail.trim()) return;
+  const handleAddPhone = async () => {
+    if (!newPhone.trim()) return;
     setAdding(true);
     try {
-      const { error } = await supabase.from("whitelist").insert({ email: newEmail.toLowerCase().trim(), batch_number: parseInt(newBatch), added_by: user?.id });
+      const cleanedPhone = newPhone.replace(/\s+/g, "").replace(/^\+/, "");
+      const email = `${cleanedPhone}@qurba.app`;
+      const { error } = await supabase.from("whitelist").insert({ email, phone_number: cleanedPhone, batch_number: parseInt(newBatch), added_by: user?.id });
       if (error) throw error;
-      toast({ title: "Email added to whitelist" });
-      setNewEmail(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
+      toast({ title: "Phone number added to whitelist" });
+      setNewPhone(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
     } catch (error: unknown) {
-      toast({ title: "Failed to add email", description: (error as { message?: string }).message, variant: "destructive" });
+      toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
     } finally {
       setAdding(false);
     }
   };
 
   const handleBulkAdd = async () => {
-    const emails = bulkEmails.split(/[\n,;]/).map(e => e.toLowerCase().trim()).filter(e => e && e.includes("@"));
-    if (emails.length === 0) { toast({ title: "No valid emails found", variant: "destructive" }); return; }
+    const phones = bulkPhones.split(/[\n,;]/).map(p => p.replace(/\s+/g, "").replace(/^\+/, "")).filter(p => p.length >= 7);
+    if (phones.length === 0) { toast({ title: "No valid phone numbers found", variant: "destructive" }); return; }
     setAdding(true);
     try {
-      const { error } = await supabase.from("whitelist").insert(emails.map(email => ({ email, batch_number: parseInt(bulkBatch), added_by: user?.id })));
+      const { error } = await supabase.from("whitelist").insert(phones.map(phone => ({ email: `${phone}@qurba.app`, phone_number: phone, batch_number: parseInt(bulkBatch), added_by: user?.id })));
       if (error) throw error;
-      toast({ title: `${emails.length} emails added to whitelist` });
-      setBulkEmails(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
+      toast({ title: `${phones.length} phone numbers added to whitelist` });
+      setBulkPhones(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
     } catch (error: unknown) {
-      toast({ title: "Failed to add emails", description: (error as { message?: string }).message, variant: "destructive" });
+      toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
     } finally {
       setAdding(false);
     }
@@ -177,9 +191,9 @@ export default function AdminUsers() {
     try {
       const { error } = await supabase.from("whitelist").delete().eq("id", id);
       if (error) throw error;
-      toast({ title: "Email removed from whitelist" }); fetchData();
+      toast({ title: "Removed from whitelist" }); fetchData();
     } catch {
-      toast({ title: "Failed to remove email", variant: "destructive" });
+      toast({ title: "Failed to remove", variant: "destructive" });
     }
   };
 
@@ -194,7 +208,37 @@ export default function AdminUsers() {
     }
   };
 
-  const batchInfo = users.reduce((acc, user) => {
+  const openEditUser = (userProfile: UserProfile) => {
+    setEditingUser(userProfile);
+    setEditBatch(userProfile.batch_number.toString());
+    setEditFullName(userProfile.full_name);
+    setEditPlace(userProfile.place);
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+    try {
+      const { error } = await supabase.from("profiles").update({
+        batch_number: parseInt(editBatch),
+        full_name: editFullName,
+        place: editPlace,
+      }).eq("id", editingUser.id);
+      if (error) throw error;
+      toast({ title: "User updated" });
+      setShowEditDialog(false);
+      setEditingUser(null);
+      fetchData();
+    } catch {
+      toast({ title: "Failed to update user", variant: "destructive" });
+    }
+  };
+
+  // Batch info from registered users only (whose email is in whitelist)
+  const whitelistEmails = new Set(whitelist.map(w => w.email));
+  const activeUsers = users.filter(u => whitelistEmails.has(u.email));
+
+  const batchInfo = activeUsers.reduce((acc, user) => {
     const batch = user.batch_number || 1;
     const existing = acc.find(b => b.batchNumber === batch);
     if (existing) existing.studentCount++;
@@ -203,7 +247,7 @@ export default function AdminUsers() {
   }, [] as { batchNumber: number; studentCount: number }[]);
   batchInfo.sort((a, b) => a.batchNumber - b.batchNumber);
 
-  const selectedBatchStudents = users.filter(u => u.batch_number === selectedBatch);
+  const selectedBatchStudents = activeUsers.filter(u => u.batch_number === selectedBatch);
 
   return (
     <DashboardLayout>
@@ -218,7 +262,7 @@ export default function AdminUsers() {
               <Upload className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Bulk Import</span>
             </Button>
             <Button size="sm" onClick={() => setShowAddDialog(true)} className="flex-1 sm:flex-none">
-              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add Email</span>
+              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add Number</span>
             </Button>
           </div>
         </div>
@@ -227,6 +271,7 @@ export default function AdminUsers() {
           <TabsList>
             <TabsTrigger value="batches">Batches</TabsTrigger>
             <TabsTrigger value="whitelist">Whitelist</TabsTrigger>
+            <TabsTrigger value="users">All Users</TabsTrigger>
           </TabsList>
 
           <TabsContent value="batches" className="space-y-6">
@@ -251,19 +296,19 @@ export default function AdminUsers() {
           <TabsContent value="whitelist">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Email Whitelist</CardTitle>
-                <CardDescription>Only whitelisted emails can register. Toggle 🔑 to enable password reset.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Phone Number Whitelist</CardTitle>
+                <CardDescription>Only whitelisted numbers can register. Toggle 🔑 to enable password reset.</CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 {loading ? (
                   <div className="text-center py-8">Loading...</div>
                 ) : whitelist.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No emails in whitelist yet</div>
+                  <div className="text-center py-8 text-muted-foreground">No entries in whitelist yet</div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Email</TableHead>
+                        <TableHead>Phone / Email</TableHead>
                         <TableHead className="hidden sm:table-cell">Batch</TableHead>
                         <TableHead className="hidden sm:table-cell">Status</TableHead>
                         <TableHead className="text-center">🔑 Reset</TableHead>
@@ -273,9 +318,10 @@ export default function AdminUsers() {
                     <TableBody>
                       {whitelist.map((entry) => {
                         const isRegistered = users.some(u => u.email === entry.email);
+                        const displayName = entry.phone_number || entry.email;
                         return (
                           <TableRow key={entry.id}>
-                            <TableCell className="font-medium text-sm">{entry.email}</TableCell>
+                            <TableCell className="font-medium text-sm">{displayName}</TableCell>
                             <TableCell className="hidden sm:table-cell">
                               <Badge variant="outline">Batch {entry.batch_number || 1}</Badge>
                             </TableCell>
@@ -304,19 +350,64 @@ export default function AdminUsers() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Registered Users</CardTitle>
+                <CardDescription>View and edit user details</CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                {users.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No registered users yet</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>WhatsApp</TableHead>
+                        <TableHead className="hidden sm:table-cell">Place</TableHead>
+                        <TableHead>Batch</TableHead>
+                        <TableHead className="hidden sm:table-cell">Source</TableHead>
+                        <TableHead className="hidden sm:table-cell">Referred By</TableHead>
+                        <TableHead className="w-[60px]">Edit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-medium">{u.full_name}</TableCell>
+                          <TableCell className="text-sm">{u.whatsapp_number}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm">{u.place}</TableCell>
+                          <TableCell><Badge variant="outline">Batch {u.batch_number}</Badge></TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm">{u.signup_source || "-"}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm">{u.referred_by || "-"}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => openEditUser(u)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
-        {/* Add Single Email Dialog */}
+        {/* Add Single Phone Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Email to Whitelist</DialogTitle>
-              <DialogDescription>This email will be able to register for the course</DialogDescription>
+              <DialogTitle>Add Phone Number to Whitelist</DialogTitle>
+              <DialogDescription>This number will be able to register for the course</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" placeholder="user@example.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                <Label htmlFor="phone">WhatsApp Number</Label>
+                <Input id="phone" type="tel" placeholder="91XXXXXXXXXX" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="batch">Batch Number</Label>
@@ -332,8 +423,8 @@ export default function AdminUsers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddEmail} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Email
+              <Button onClick={handleAddPhone} disabled={adding}>
+                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Number
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -343,8 +434,8 @@ export default function AdminUsers() {
         <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Bulk Import Emails</DialogTitle>
-              <DialogDescription>Paste multiple emails (separated by commas, semicolons, or new lines)</DialogDescription>
+              <DialogTitle>Bulk Import Phone Numbers</DialogTitle>
+              <DialogDescription>Paste multiple phone numbers (separated by commas, semicolons, or new lines)</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -359,15 +450,64 @@ export default function AdminUsers() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bulkEmails">Email Addresses</Label>
-                <Textarea id="bulkEmails" placeholder={"user1@example.com\nuser2@example.com"} value={bulkEmails} onChange={(e) => setBulkEmails(e.target.value)} rows={6} />
+                <Label htmlFor="bulkPhones">Phone Numbers</Label>
+                <Textarea id="bulkPhones" placeholder={"91XXXXXXXXXX\n91XXXXXXXXXX"} value={bulkPhones} onChange={(e) => setBulkPhones(e.target.value)} rows={6} />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
               <Button onClick={handleBulkAdd} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Emails
+                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Numbers
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>Update user details</DialogDescription>
+            </DialogHeader>
+            {editingUser && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Place</Label>
+                  <Input value={editPlace} onChange={(e) => setEditPlace(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>WhatsApp Number</Label>
+                  <Input value={editingUser.whatsapp_number} disabled className="opacity-60" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input value={editingUser.email} disabled className="opacity-60" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Batch Number</Label>
+                  <Select value={editBatch} onValueChange={setEditBatch}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 20 }, (_, i) => (
+                        <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                  <div><span className="font-medium">Referred By:</span> {editingUser.referred_by || "None"}</div>
+                  <div><span className="font-medium">Source:</span> {editingUser.signup_source || "None"}</div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+              <Button onClick={handleSaveEdit}>Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

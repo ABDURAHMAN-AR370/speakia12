@@ -25,36 +25,30 @@ export default function Login() {
   const { toast } = useToast();
 
   const resolveEmail = async (input: string): Promise<string | null> => {
-    // If it looks like an email, return as-is
+    // If it looks like an email already, return as-is
     if (input.includes("@")) return input.toLowerCase();
     
-    // Try to find by WhatsApp number
-    const cleaned = input.replace(/\s+/g, "").replace(/^(\+)/, "");
+    // Build email from phone number
+    const cleaned = input.replace(/\s+/g, "").replace(/^\+/, "");
+    const generatedEmail = `${cleaned}@qurba.app`;
+    
+    // Check if this email exists in profiles
     const { data } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("email", generatedEmail)
+      .maybeSingle();
+    
+    if (data) return data.email;
+
+    // Fallback: try to find by WhatsApp number in profiles
+    const { data: data2 } = await supabase
       .from("profiles")
       .select("email")
       .eq("whatsapp_number", cleaned)
       .maybeSingle();
     
-    if (data) return data.email;
-
-    // Try with + prefix
-    const { data: data2 } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("whatsapp_number", `+${cleaned}`)
-      .maybeSingle();
-    
-    if (data2) return data2.email;
-
-    // Try original input
-    const { data: data3 } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("whatsapp_number", input)
-      .maybeSingle();
-    
-    return data3?.email || null;
+    return data2?.email || null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,10 +107,6 @@ export default function Login() {
     e.preventDefault();
     if (newPassword !== confirmNewPassword) {
       toast({ title: "Passwords don't match", variant: "destructive" });
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
 
@@ -237,17 +227,16 @@ export default function Login() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign In</CardTitle>
             <CardDescription className="text-center">
-              Enter your user id & password
+              Enter your WhatsApp number & password
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="identifier">User id</Label>
+                <Label htmlFor="identifier">WhatsApp Number</Label>
                 <Input
                   id="identifier"
-                  type="text"
-                  placeholder="whatsappnumebr@gmail.com"
+                  type="tel"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
