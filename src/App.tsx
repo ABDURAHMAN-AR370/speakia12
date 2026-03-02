@@ -15,6 +15,8 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminDays from "./pages/admin/AdminDays";
 import AdminForms from "./pages/admin/AdminForms";
 import AdminHero from "./pages/admin/AdminHero";
+import AdminReferrals from "./pages/admin/AdminReferrals";
+import StudentDetail from "./pages/admin/StudentDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
           <Route path="/admin/days" element={<ProtectedRoute requireAdmin><AdminDays /></ProtectedRoute>} />
           <Route path="/admin/forms" element={<ProtectedRoute requireAdmin><AdminForms /></ProtectedRoute>} />
           <Route path="/admin/hero" element={<ProtectedRoute requireAdmin><AdminHero /></ProtectedRoute>} />
+          <Route path="/admin/referrals" element={<ProtectedRoute requireAdmin><AdminReferrals /></ProtectedRoute>} />
+          <Route path="/admin/student/:userId" element={<ProtectedRoute requireAdmin><StudentDetail /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <WhatsAppButton />

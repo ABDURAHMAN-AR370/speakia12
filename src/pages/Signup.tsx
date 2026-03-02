@@ -14,15 +14,15 @@ const SIGNUP_SOURCES = ["Instagram", "WhatsApp", "Friends", "Family Members", "Y
 
 export default function Signup() {
   const [searchParams] = useSearchParams();
-  const referralCode = searchParams.get("ref") || "";
+  const referralFromUrl = searchParams.get("ref") || "";
 
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",
     fullName: "",
-    place: "",
     whatsappNumber: "",
     signupSource: "",
+    referralCode: referralFromUrl,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -49,7 +49,6 @@ export default function Signup() {
 
     setLoading(true);
 
-    // Build email from whatsapp number
     const email = `${formData.whatsappNumber.replace(/\s+/g, "")}@qurba.app`;
 
     const result = await signUp(
@@ -57,10 +56,10 @@ export default function Signup() {
       formData.password,
       formData.fullName,
       "not_specified",
-      formData.place,
+      "",
       formData.whatsappNumber,
-      referralCode,
-      formData.signupSource
+      formData.referralCode || undefined,
+      formData.signupSource || undefined
     );
 
     if (result.success) {
@@ -90,7 +89,7 @@ export default function Signup() {
           </div>
           <h1 className="text-3xl font-bold text-foreground">QURBA</h1>
           <p className="text-muted-foreground mt-2">Quran Course</p>
-          {referralCode && (
+          {referralFromUrl && (
             <p className="text-sm text-primary mt-1">Referred by a friend 🎉</p>
           )}
         </div>
@@ -98,20 +97,13 @@ export default function Signup() {
         <Card className="border-border shadow-lg">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Create Account</CardTitle>
-            <CardDescription className="text-center">
-              Fill in your details to join the course
-            </CardDescription>
+            <CardDescription className="text-center">Fill in your details to join the course</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
                 <Input id="fullName" type="text" value={formData.fullName} onChange={(e) => handleChange("fullName", e.target.value)} required disabled={loading} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="place">Place</Label>
-                <Input id="place" type="text" value={formData.place} onChange={(e) => handleChange("place", e.target.value)} required disabled={loading} />
               </div>
 
               <div className="space-y-2">
@@ -129,6 +121,11 @@ export default function Signup() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+                <Input id="referralCode" type="text" value={formData.referralCode} onChange={(e) => handleChange("referralCode", e.target.value)} disabled={loading} />
               </div>
 
               <div className="space-y-2">

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,40 +15,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
 
 interface WhitelistEntry {
-  id: string;
-  email: string;
-  phone_number: string | null;
-  batch_number: number;
-  created_at: string;
-  password_reset_enabled: boolean;
+  id: string; email: string; phone_number: string | null; batch_number: number; created_at: string; password_reset_enabled: boolean;
 }
-
 interface UserProfile {
-  id: string;
-  user_id: string;
-  email: string;
-  full_name: string;
-  gender: string;
-  place: string;
-  whatsapp_number: string;
-  batch_number: number;
-  created_at: string;
-  referred_by: string | null;
-  signup_source: string | null;
+  id: string; user_id: string; email: string; full_name: string; gender: string; place: string; whatsapp_number: string; batch_number: number; created_at: string; referred_by: string | null; signup_source: string | null;
 }
-
 interface CompletionData { user_id: string; day_number: number; completed_at: string; }
 interface TopperData { user_id: string; full_name: string; total_score: number; max_possible: number; percentage: number; quizzes_taken: number; }
 
 export default function AdminUsers() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [completions, setCompletions] = useState<CompletionData[]>([]);
@@ -68,11 +53,14 @@ export default function AdminUsers() {
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("batches");
 
-  useEffect(() => { fetchData(); }, []);
+  // Search and sort state
+  const [whitelistSearch, setWhitelistSearch] = useState("");
+  const [whitelistSort, setWhitelistSort] = useState<"batch" | "date" | "status">("batch");
+  const [userSearch, setUserSearch] = useState("");
+  const [userSort, setUserSort] = useState<"name" | "batch" | "date">("name");
 
-  useEffect(() => {
-    if (selectedBatch) fetchBatchData(selectedBatch);
-  }, [selectedBatch]);
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (selectedBatch) fetchBatchData(selectedBatch); }, [selectedBatch]);
 
   const fetchData = async () => {
     try {
@@ -83,7 +71,7 @@ export default function AdminUsers() {
       setWhitelist(whitelistResult.data || []);
       setUsers(usersResult.data || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -126,13 +114,11 @@ export default function AdminUsers() {
       });
       setCompletions(dayCompletions);
 
-      // Fetch quiz submissions - only for materials that still exist
       const existingMaterialIds = new Set(materialsData?.map(m => m.id) || []);
       const { data: quizSubmissions } = await supabase.from("quiz_submissions").select("user_id, score, max_score, material_id").in("user_id", userIds);
-      
+
       const userScores = new Map<string, { total: number; max: number; count: number }>();
       quizSubmissions?.forEach(sub => {
-        // Only count if the material still exists
         if (!existingMaterialIds.has(sub.material_id)) return;
         if (!userScores.has(sub.user_id)) userScores.set(sub.user_id, { total: 0, max: 0, count: 0 });
         const scores = userScores.get(sub.user_id)!;
@@ -146,11 +132,10 @@ export default function AdminUsers() {
           toppersList.push({ user_id: userId, full_name: userProfile.full_name, total_score: scores.total, max_possible: scores.max, percentage: (scores.total / scores.max) * 100, quizzes_taken: scores.count });
         }
       });
-      // Sort by total score (highest first)
       toppersList.sort((a, b) => b.total_score - a.total_score);
       setToppers(toppersList);
     } catch (error) {
-      console.error("Error fetching batch data:", error);
+      console.error(error);
     }
   };
 
@@ -162,29 +147,23 @@ export default function AdminUsers() {
       const email = `${cleanedPhone}@qurba.app`;
       const { error } = await supabase.from("whitelist").insert({ email, phone_number: cleanedPhone, batch_number: parseInt(newBatch), added_by: user?.id });
       if (error) throw error;
-      toast({ title: "Phone number added to whitelist" });
-      setNewPhone(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
+      toast({ title: "Phone number added" }); setNewPhone(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
     } catch (error: unknown) {
       toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
-    } finally {
-      setAdding(false);
-    }
+    } finally { setAdding(false); }
   };
 
   const handleBulkAdd = async () => {
     const phones = bulkPhones.split(/[\n,;]/).map(p => p.replace(/\s+/g, "").replace(/^\+/, "")).filter(p => p.length >= 7);
-    if (phones.length === 0) { toast({ title: "No valid phone numbers found", variant: "destructive" }); return; }
+    if (phones.length === 0) { toast({ title: "No valid phone numbers", variant: "destructive" }); return; }
     setAdding(true);
     try {
       const { error } = await supabase.from("whitelist").insert(phones.map(phone => ({ email: `${phone}@qurba.app`, phone_number: phone, batch_number: parseInt(bulkBatch), added_by: user?.id })));
       if (error) throw error;
-      toast({ title: `${phones.length} phone numbers added to whitelist` });
-      setBulkPhones(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
+      toast({ title: `${phones.length} numbers added` }); setBulkPhones(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
     } catch (error: unknown) {
       toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
-    } finally {
-      setAdding(false);
-    }
+    } finally { setAdding(false); }
   };
 
   const handleRemoveFromWhitelist = async (id: string) => {
@@ -192,49 +171,30 @@ export default function AdminUsers() {
       const { error } = await supabase.from("whitelist").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Removed from whitelist" }); fetchData();
-    } catch {
-      toast({ title: "Failed to remove", variant: "destructive" });
-    }
+    } catch { toast({ title: "Failed to remove", variant: "destructive" }); }
   };
 
   const handleTogglePasswordReset = async (id: string, enabled: boolean) => {
     try {
       const { error } = await supabase.from("whitelist").update({ password_reset_enabled: enabled }).eq("id", id);
       if (error) throw error;
-      toast({ title: enabled ? "Password reset enabled" : "Password reset disabled" });
-      fetchData();
-    } catch {
-      toast({ title: "Failed to update", variant: "destructive" });
-    }
+      toast({ title: enabled ? "Password reset enabled" : "Password reset disabled" }); fetchData();
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
   };
 
   const openEditUser = (userProfile: UserProfile) => {
-    setEditingUser(userProfile);
-    setEditBatch(userProfile.batch_number.toString());
-    setEditFullName(userProfile.full_name);
-    setEditPlace(userProfile.place);
-    setShowEditDialog(true);
+    setEditingUser(userProfile); setEditBatch(userProfile.batch_number.toString()); setEditFullName(userProfile.full_name); setEditPlace(userProfile.place); setShowEditDialog(true);
   };
 
   const handleSaveEdit = async () => {
     if (!editingUser) return;
     try {
-      const { error } = await supabase.from("profiles").update({
-        batch_number: parseInt(editBatch),
-        full_name: editFullName,
-        place: editPlace,
-      }).eq("id", editingUser.id);
+      const { error } = await supabase.from("profiles").update({ batch_number: parseInt(editBatch), full_name: editFullName, place: editPlace }).eq("id", editingUser.id);
       if (error) throw error;
-      toast({ title: "User updated" });
-      setShowEditDialog(false);
-      setEditingUser(null);
-      fetchData();
-    } catch {
-      toast({ title: "Failed to update user", variant: "destructive" });
-    }
+      toast({ title: "User updated" }); setShowEditDialog(false); setEditingUser(null); fetchData();
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
   };
 
-  // Batch info from registered users only (whose email is in whitelist)
   const whitelistEmails = new Set(whitelist.map(w => w.email));
   const activeUsers = users.filter(u => whitelistEmails.has(u.email));
 
@@ -248,6 +208,42 @@ export default function AdminUsers() {
   batchInfo.sort((a, b) => a.batchNumber - b.batchNumber);
 
   const selectedBatchStudents = activeUsers.filter(u => u.batch_number === selectedBatch);
+
+  // Filtered/sorted whitelist
+  const filteredWhitelist = useMemo(() => {
+    let list = whitelist.filter(e => {
+      const q = whitelistSearch.toLowerCase();
+      if (!q) return true;
+      return (e.phone_number || "").toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
+    });
+    list.sort((a, b) => {
+      if (whitelistSort === "batch") return a.batch_number - b.batch_number;
+      if (whitelistSort === "date") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (whitelistSort === "status") {
+        const aReg = users.some(u => u.email === a.email) ? 0 : 1;
+        const bReg = users.some(u => u.email === b.email) ? 0 : 1;
+        return aReg - bReg;
+      }
+      return 0;
+    });
+    return list;
+  }, [whitelist, whitelistSearch, whitelistSort, users]);
+
+  // Filtered/sorted users
+  const filteredUsers = useMemo(() => {
+    let list = users.filter(u => {
+      const q = userSearch.toLowerCase();
+      if (!q) return true;
+      return u.full_name.toLowerCase().includes(q) || u.whatsapp_number.includes(q) || u.email.toLowerCase().includes(q);
+    });
+    list.sort((a, b) => {
+      if (userSort === "name") return a.full_name.localeCompare(b.full_name);
+      if (userSort === "batch") return a.batch_number - b.batch_number;
+      if (userSort === "date") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return 0;
+    });
+    return list;
+  }, [users, userSearch, userSort]);
 
   return (
     <DashboardLayout>
@@ -299,54 +295,59 @@ export default function AdminUsers() {
                 <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Phone Number Whitelist</CardTitle>
                 <CardDescription>Only whitelisted numbers can register. Toggle 🔑 to enable password reset.</CardDescription>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-8">Loading...</div>
-                ) : whitelist.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No entries in whitelist yet</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Phone / Email</TableHead>
-                        <TableHead className="hidden sm:table-cell">Batch</TableHead>
-                        <TableHead className="hidden sm:table-cell">Status</TableHead>
-                        <TableHead className="text-center">🔑 Reset</TableHead>
-                        <TableHead className="w-[60px]">Del</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {whitelist.map((entry) => {
-                        const isRegistered = users.some(u => u.email === entry.email);
-                        const displayName = entry.phone_number || entry.email;
-                        return (
-                          <TableRow key={entry.id}>
-                            <TableCell className="font-medium text-sm">{displayName}</TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <Badge variant="outline">Batch {entry.batch_number || 1}</Badge>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <Badge variant={isRegistered ? "default" : "secondary"}>
-                                {isRegistered ? "Registered" : "Pending"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Switch
-                                checked={entry.password_reset_enabled}
-                                onCheckedChange={(checked) => handleTogglePasswordReset(entry.id, checked)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" onClick={() => handleRemoveFromWhitelist(entry.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
+              <CardContent className="space-y-4">
+                {/* Search & Sort */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search phone or email..." value={whitelistSearch} onChange={e => setWhitelistSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Select value={whitelistSort} onValueChange={(v: "batch" | "date" | "status") => setWhitelistSort(v)}>
+                    <SelectTrigger className="w-[140px]"><ArrowUpDown className="h-4 w-4 mr-1" /><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="batch">By Batch</SelectItem>
+                      <SelectItem value="date">By Date</SelectItem>
+                      <SelectItem value="status">By Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="overflow-x-auto">
+                  {loading ? (
+                    <div className="text-center py-8">Loading...</div>
+                  ) : filteredWhitelist.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No entries found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Phone / Email</TableHead>
+                          <TableHead className="hidden sm:table-cell">Batch</TableHead>
+                          <TableHead className="hidden sm:table-cell">Status</TableHead>
+                          <TableHead className="text-center">🔑 Reset</TableHead>
+                          <TableHead className="w-[60px]">Del</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredWhitelist.map((entry) => {
+                          const isRegistered = users.some(u => u.email === entry.email);
+                          return (
+                            <TableRow key={entry.id}>
+                              <TableCell className="font-medium text-sm">{entry.phone_number || entry.email}</TableCell>
+                              <TableCell className="hidden sm:table-cell"><Badge variant="outline">Batch {entry.batch_number}</Badge></TableCell>
+                              <TableCell className="hidden sm:table-cell"><Badge variant={isRegistered ? "default" : "secondary"}>{isRegistered ? "Registered" : "Pending"}</Badge></TableCell>
+                              <TableCell className="text-center">
+                                <Switch checked={entry.password_reset_enabled} onCheckedChange={(checked) => handleTogglePasswordReset(entry.id, checked)} />
+                              </TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveFromWhitelist(entry.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -355,43 +356,56 @@ export default function AdminUsers() {
             <Card>
               <CardHeader>
                 <CardTitle>All Registered Users</CardTitle>
-                <CardDescription>View and edit user details</CardDescription>
+                <CardDescription>View and edit user details. Click name to see full profile.</CardDescription>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                {users.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No registered users yet</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>WhatsApp</TableHead>
-                        <TableHead className="hidden sm:table-cell">Place</TableHead>
-                        <TableHead>Batch</TableHead>
-                        <TableHead className="hidden sm:table-cell">Source</TableHead>
-                        <TableHead className="hidden sm:table-cell">Referred By</TableHead>
-                        <TableHead className="w-[60px]">Edit</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.full_name}</TableCell>
-                          <TableCell className="text-sm">{u.whatsapp_number}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm">{u.place}</TableCell>
-                          <TableCell><Badge variant="outline">Batch {u.batch_number}</Badge></TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm">{u.signup_source || "-"}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm">{u.referred_by || "-"}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" onClick={() => openEditUser(u)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
+              <CardContent className="space-y-4">
+                {/* Search & Sort */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search name, number, or email..." value={userSearch} onChange={e => setUserSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Select value={userSort} onValueChange={(v: "name" | "batch" | "date") => setUserSort(v)}>
+                    <SelectTrigger className="w-[140px]"><ArrowUpDown className="h-4 w-4 mr-1" /><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name">By Name</SelectItem>
+                      <SelectItem value="batch">By Batch</SelectItem>
+                      <SelectItem value="date">By Date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="overflow-x-auto">
+                  {filteredUsers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No users found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>WhatsApp</TableHead>
+                          <TableHead className="hidden sm:table-cell">Place</TableHead>
+                          <TableHead>Batch</TableHead>
+                          <TableHead className="hidden sm:table-cell">Source</TableHead>
+                          <TableHead className="w-[60px]">Edit</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsers.map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-medium cursor-pointer hover:text-primary" onClick={() => navigate(`/admin/student/${u.user_id}`)}>{u.full_name}</TableCell>
+                            <TableCell className="text-sm">{u.whatsapp_number}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-sm">{u.place || "-"}</TableCell>
+                            <TableCell><Badge variant="outline">Batch {u.batch_number}</Badge></TableCell>
+                            <TableCell className="hidden sm:table-cell text-sm">{u.signup_source || "-"}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => openEditUser(u)}><Pencil className="h-4 w-4" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -400,32 +414,17 @@ export default function AdminUsers() {
         {/* Add Single Phone Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Phone Number to Whitelist</DialogTitle>
-              <DialogDescription>This number will be able to register for the course</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Add Phone Number to Whitelist</DialogTitle><DialogDescription>This number will be able to register</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-2"><Label>WhatsApp Number</Label><Input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} /></div>
               <div className="space-y-2">
-                <Label htmlFor="phone">WhatsApp Number</Label>
-                <Input id="phone" type="tel" placeholder="91XXXXXXXXXX" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="batch">Batch Number</Label>
-                <Select value={newBatch} onValueChange={setNewBatch}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 20 }, (_, i) => (
-                      <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Batch Number</Label>
+                <Select value={newBatch} onValueChange={setNewBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddPhone} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Number
-              </Button>
+              <Button onClick={handleAddPhone} disabled={adding}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Number</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -433,32 +432,17 @@ export default function AdminUsers() {
         {/* Bulk Import Dialog */}
         <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Bulk Import Phone Numbers</DialogTitle>
-              <DialogDescription>Paste multiple phone numbers (separated by commas, semicolons, or new lines)</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Bulk Import Phone Numbers</DialogTitle><DialogDescription>Paste multiple numbers separated by commas, semicolons, or new lines</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="bulkBatch">Batch Number</Label>
-                <Select value={bulkBatch} onValueChange={setBulkBatch}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 20 }, (_, i) => (
-                      <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Batch Number</Label>
+                <Select value={bulkBatch} onValueChange={setBulkBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="bulkPhones">Phone Numbers</Label>
-                <Textarea id="bulkPhones" placeholder={"91XXXXXXXXXX\n91XXXXXXXXXX"} value={bulkPhones} onChange={(e) => setBulkPhones(e.target.value)} rows={6} />
-              </div>
+              <div className="space-y-2"><Label>Phone Numbers</Label><Textarea placeholder={"91XXXXXXXXXX\n91XXXXXXXXXX"} value={bulkPhones} onChange={(e) => setBulkPhones(e.target.value)} rows={6} /></div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
-              <Button onClick={handleBulkAdd} disabled={adding}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Numbers
-              </Button>
+              <Button onClick={handleBulkAdd} disabled={adding}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Numbers</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -466,38 +450,15 @@ export default function AdminUsers() {
         {/* Edit User Dialog */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
-              <DialogDescription>Update user details</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Edit User</DialogTitle><DialogDescription>Update user details</DialogDescription></DialogHeader>
             {editingUser && (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Place</Label>
-                  <Input value={editPlace} onChange={(e) => setEditPlace(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>WhatsApp Number</Label>
-                  <Input value={editingUser.whatsapp_number} disabled className="opacity-60" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input value={editingUser.email} disabled className="opacity-60" />
-                </div>
+                <div className="space-y-2"><Label>Full Name</Label><Input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Place</Label><Input value={editPlace} onChange={(e) => setEditPlace(e.target.value)} /></div>
+                <div className="space-y-2"><Label>WhatsApp Number</Label><Input value={editingUser.whatsapp_number} disabled className="opacity-60" /></div>
                 <div className="space-y-2">
                   <Label>Batch Number</Label>
-                  <Select value={editBatch} onValueChange={setEditBatch}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 20 }, (_, i) => (
-                        <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Select value={editBatch} onValueChange={setEditBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                   <div><span className="font-medium">Referred By:</span> {editingUser.referred_by || "None"}</div>
