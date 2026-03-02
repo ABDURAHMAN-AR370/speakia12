@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -28,6 +29,7 @@ interface AttendanceRegisterProps {
 
 export default function AttendanceRegister({ batchNumber, students, completions, onBack }: AttendanceRegisterProps) {
   const { totalDays } = useTotalDays();
+  const navigate = useNavigate();
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
 
   const getCompletionDate = (userId: string, dayNumber: number) => {
@@ -64,7 +66,7 @@ export default function AttendanceRegister({ batchNumber, students, completions,
               <TableBody>
                 {students.map((student) => (
                   <TableRow key={student.id}>
-                    <TableCell className="sticky left-0 bg-background font-medium">{student.full_name}</TableCell>
+                    <TableCell className="sticky left-0 bg-background font-medium cursor-pointer hover:text-primary" onClick={() => navigate(`/admin/student/${student.user_id}`)}>{student.full_name}</TableCell>
                     {days.map((day) => {
                       const completedAt = getCompletionDate(student.user_id, day);
                       return (
