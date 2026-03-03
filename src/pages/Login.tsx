@@ -22,16 +22,19 @@ export default function Login() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [resolvedEmail, setResolvedEmail] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const resolveEmail = async (input: string): Promise<string | null> => {
     if (input.includes("@")) return input.toLowerCase();
     const cleaned = input.replace(/\s+/g, "").replace(/^\+/, "");
+    // Try generated email format first via whitelist (publicly accessible)
     const generatedEmail = `${cleaned}@qurba.app`;
-    const { data } = await supabase.from("profiles").select("email").eq("email", generatedEmail).maybeSingle();
+    const { data } = await supabase.from("whitelist").select("email").eq("email", generatedEmail).maybeSingle();
     if (data) return data.email;
-    const { data: data2 } = await supabase.from("profiles").select("email").eq("whatsapp_number", cleaned).maybeSingle();
+    // Try matching phone_number in whitelist
+    const { data: data2 } = await supabase.from("whitelist").select("email").eq("phone_number", cleaned).maybeSingle();
     return data2?.email || null;
   };
 
@@ -50,6 +53,7 @@ export default function Login() {
     // Check if password reset is enabled
     const { data: whitelistData } = await supabase.from("whitelist").select("password_reset_enabled").eq("email", email).maybeSingle();
     if (whitelistData?.password_reset_enabled) {
+      setResolvedEmail(email);
       setResetMode(true);
       setLoading(false);
       return;
@@ -84,7 +88,8 @@ export default function Login() {
     }
 
     setResettingPassword(true);
-    const email = await resolveEmail(identifier);
+    // Use the already resolved email instead of re-resolving
+    const email = resolvedEmail || await resolveEmail(identifier);
     if (!email) {
       toast({ title: "Account not found", variant: "destructive" });
       setResettingPassword(false);
@@ -92,7 +97,6 @@ export default function Login() {
     }
 
     try {
-      // Call edge function to reset password using service role
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`, {
         method: "POST",
         headers: {

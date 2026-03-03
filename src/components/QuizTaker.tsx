@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +42,6 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
   };
 
   const handleSubmit = async () => {
-    // Grade the quiz
     let score = 0;
     const maxScore = quiz.questions.reduce((sum, q) => sum + (q.points || quiz.points_per_question), 0);
     const details: Record<string, boolean> = {};
@@ -61,19 +60,20 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
     setResults({ score, maxScore, details });
     setShowResults(true);
 
-    // Auto-submit after grading
+    // Save in background - don't close dialog
     setLoading(true);
     await onSubmit(answers, score, maxScore);
     setLoading(false);
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={() => { if (showResults) onClose(); }}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{quiz.name}</DialogTitle>
-          {quiz.description && <p className="text-sm text-muted-foreground">{quiz.description}</p>}
-          <p className="text-xs text-muted-foreground">For: {materialTitle}</p>
+          <DialogDescription>
+            {quiz.description || `Quiz for: ${materialTitle}`}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -149,13 +149,15 @@ export default function QuizTaker({ quiz, materialTitle, onClose, onSubmit }: Qu
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            {showResults ? "Close" : "Cancel"}
-          </Button>
-          {!showResults && (
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : "Submit Quiz"}
-            </Button>
+          {showResults ? (
+            <Button onClick={onClose}>Close</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+              <Button onClick={handleSubmit} disabled={loading}>
+                {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : "Submit Quiz"}
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
