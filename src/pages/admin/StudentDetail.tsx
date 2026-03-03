@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Pencil, Save, CheckCircle, XCircle, Plus, Minus } from "lucide-react";
+import { ArrowLeft, Pencil, Save, CheckCircle, XCircle, Plus, Minus, Eye } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface StudentProfile {
   id: string;
@@ -27,6 +28,15 @@ interface StudentProfile {
   signup_source: string | null;
 }
 
+interface QuizQuestion {
+  id: string;
+  type: "mcq" | "true_false" | "short_answer";
+  question: string;
+  options?: string[];
+  correctAnswer: string | string[];
+  points: number;
+}
+
 interface QuizSubmission {
   id: string;
   quiz_id: string;
@@ -34,9 +44,12 @@ interface QuizSubmission {
   score: number;
   max_score: number;
   submitted_at: string;
+  answers: Record<string, string>;
   quiz_name?: string;
   day_number?: number;
   material_exists?: boolean;
+  questions?: QuizQuestion[];
+  points_per_question?: number;
 }
 
 interface DayStatus {
@@ -58,6 +71,7 @@ export default function StudentDetail() {
   const [editData, setEditData] = useState({ full_name: "", place: "", batch_number: "1" });
   const [graceDialog, setGraceDialog] = useState<QuizSubmission | null>(null);
   const [graceMarks, setGraceMarks] = useState("0");
+  const [viewQuiz, setViewQuiz] = useState<QuizSubmission | null>(null);
 
   useEffect(() => {
     if (userId) fetchStudentData();
@@ -66,7 +80,6 @@ export default function StudentDetail() {
   const fetchStudentData = async () => {
     setLoading(true);
     try {
-      // Fetch profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -81,7 +94,6 @@ export default function StudentDetail() {
         });
       }
 
-      // Fetch all materials and progress
       const [materialsRes, progressRes] = await Promise.all([
         supabase.from("course_materials").select("id, day_number"),
         supabase.from("user_progress").select("material_id, completed_at").eq("user_id", userId!),
@@ -92,7 +104,6 @@ export default function StudentDetail() {
       const completedIds = new Set(progress.map(p => p.material_id));
       const existingMaterialIds = new Set(materials.map(m => m.id));
 
-      // Build day statuses
       const dayMap = new Map<number, { total: number; completed: number }>();
       materials.forEach(m => {
         if (!dayMap.has(m.day_number)) dayMap.set(m.day_number, { total: 0, completed: 0 });
@@ -105,27 +116,34 @@ export default function StudentDetail() {
       statuses.sort((a, b) => a.day_number - b.day_number);
       setDayStatuses(statuses);
 
-      // Fetch quiz submissions with quiz names
       const { data: submissions } = await supabase
         .from("quiz_submissions")
-        .select("id, quiz_id, material_id, score, max_score, submitted_at")
+        .select("id, quiz_id, material_id, score, max_score, submitted_at, answers")
         .eq("user_id", userId!);
 
       if (submissions && submissions.length > 0) {
         const quizIds = [...new Set(submissions.map(s => s.quiz_id))];
-        const { data: quizzes } = await supabase.from("quizzes").select("id, name").in("id", quizIds);
+        const { data: quizzes } = await supabase.from("quizzes").select("id, name, questions, points_per_question").in("id", quizIds);
         const materialIds = [...new Set(submissions.map(s => s.material_id))];
         const { data: mats } = await supabase.from("course_materials").select("id, day_number").in("id", materialIds);
 
-        const quizMap = new Map(quizzes?.map(q => [q.id, q.name]) || []);
+        const quizMap = new Map(quizzes?.map(q => [q.id, q]) || []);
         const matDayMap = new Map(mats?.map(m => [m.id, m.day_number]) || []);
 
-        setQuizSubmissions(submissions.map(s => ({
-          ...s,
-          quiz_name: quizMap.get(s.quiz_id) || "Unknown Quiz",
-          day_number: matDayMap.get(s.material_id),
-          material_exists: existingMaterialIds.has(s.material_id),
-        })));
+        setQuizSubmissions(submissions.map(s => {
+          const quiz = quizMap.get(s.quiz_id);
+          const questions = quiz?.questions ? (typeof quiz.questions === "string" ? JSON.parse(quiz.questions) : quiz.questions) : [];
+          const ans = typeof s.answers === "string" ? JSON.parse(s.answers) : s.answers;
+          return {
+            ...s,
+            answers: ans as Record<string, string>,
+            quiz_name: quiz?.name || "Unknown Quiz",
+            day_number: matDayMap.get(s.material_id),
+            material_exists: existingMaterialIds.has(s.material_id),
+            questions: questions as QuizQuestion[],
+            points_per_question: quiz?.points_per_question || 1,
+          };
+        }));
       }
     } catch (e) {
       console.error(e);
@@ -269,7 +287,7 @@ export default function StudentDetail() {
         <Card>
           <CardHeader>
             <CardTitle>Quiz Results</CardTitle>
-            <CardDescription>Click score to edit. Use + button to add grace marks.</CardDescription>
+            <CardDescription>Click the eye icon to view responses. Use + to add grace marks.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {activeSubmissions.length === 0 ? (
@@ -298,6 +316,9 @@ export default function StudentDetail() {
                       <TableCell className="text-sm text-muted-foreground">{new Date(sub.submitted_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setViewQuiz(sub)} title="View responses">
+                            <Eye className="h-3 w-3" />
+                          </Button>
                           <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => { setGraceDialog(sub); setGraceMarks("1"); }}>
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -335,6 +356,92 @@ export default function StudentDetail() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setGraceDialog(null)}>Cancel</Button>
               <Button onClick={handleAddGraceMark}>Add Grace Marks</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Quiz Responses Dialog */}
+        <Dialog open={!!viewQuiz} onOpenChange={() => setViewQuiz(null)}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{viewQuiz?.quiz_name} — Responses</DialogTitle>
+              <DialogDescription>
+                Score: {viewQuiz?.score}/{viewQuiz?.max_score} • Day {viewQuiz?.day_number || "-"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {viewQuiz?.questions?.map((q, idx) => {
+                const userAnswer = viewQuiz.answers?.[q.id] || "";
+                const correct = Array.isArray(q.correctAnswer)
+                  ? q.correctAnswer.map(a => a.toLowerCase())
+                  : [q.correctAnswer.toLowerCase()];
+                const isCorrect = correct.includes(userAnswer.trim().toLowerCase());
+
+                return (
+                  <div key={q.id} className="p-3 border rounded-lg space-y-2">
+                    <div className="flex items-start justify-between">
+                      <p className="font-medium text-sm">{idx + 1}. {q.question}</p>
+                      <Badge variant="outline" className="text-xs shrink-0 ml-2">
+                        {q.points || viewQuiz.points_per_question || 1} pts
+                      </Badge>
+                    </div>
+
+                    {q.type === "mcq" && q.options && (
+                      <RadioGroup value={userAnswer} disabled>
+                        {q.options.map(opt => (
+                          <div key={opt} className="flex items-center space-x-2">
+                            <RadioGroupItem value={opt} id={`view-${q.id}-${opt}`} />
+                            <Label htmlFor={`view-${q.id}-${opt}`} className={
+                              opt.toLowerCase() === (Array.isArray(q.correctAnswer) ? q.correctAnswer[0] : q.correctAnswer).toLowerCase()
+                                ? "text-green-600 font-medium"
+                                : opt === userAnswer && !isCorrect ? "text-destructive" : ""
+                            }>
+                              {opt}
+                              {opt.toLowerCase() === (Array.isArray(q.correctAnswer) ? q.correctAnswer[0] : q.correctAnswer).toLowerCase() && " ✓"}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
+
+                    {q.type === "true_false" && (
+                      <RadioGroup value={userAnswer} disabled>
+                        {["True", "False"].map(opt => (
+                          <div key={opt} className="flex items-center space-x-2">
+                            <RadioGroupItem value={opt} id={`view-${q.id}-${opt}`} />
+                            <Label htmlFor={`view-${q.id}-${opt}`} className={
+                              opt.toLowerCase() === (Array.isArray(q.correctAnswer) ? q.correctAnswer[0] : q.correctAnswer).toLowerCase()
+                                ? "text-green-600 font-medium"
+                                : opt === userAnswer && !isCorrect ? "text-destructive" : ""
+                            }>
+                              {opt}
+                              {opt.toLowerCase() === (Array.isArray(q.correctAnswer) ? q.correctAnswer[0] : q.correctAnswer).toLowerCase() && " ✓"}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
+
+                    {q.type === "short_answer" && (
+                      <div className="space-y-1">
+                        <p className="text-sm"><span className="text-muted-foreground">Student's answer:</span> <span className={isCorrect ? "text-green-600" : "text-destructive"}>{userAnswer || "(no answer)"}</span></p>
+                        <p className="text-sm"><span className="text-muted-foreground">Correct answer:</span> <span className="text-green-600">{Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : q.correctAnswer}</span></p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1 text-xs">
+                      {isCorrect ? (
+                        <><CheckCircle className="h-3.5 w-3.5 text-green-600" /><span className="text-green-600">Correct</span></>
+                      ) : (
+                        <><XCircle className="h-3.5 w-3.5 text-destructive" /><span className="text-destructive">Incorrect</span></>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setViewQuiz(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

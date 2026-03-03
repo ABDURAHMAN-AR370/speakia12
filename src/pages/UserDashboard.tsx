@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useTotalDays } from "@/hooks/useTotalDays";
-import { Check, Lock, Play } from "lucide-react";
+import { Check, Lock, Play, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DayProgress {
@@ -26,15 +26,50 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [quizScore, setQuizScore] = useState({ total: 0, max: 0 });
 
   useEffect(() => {
     if (user) {
       fetchProgress();
+      fetchQuizScore();
       if (profile?.referral_code) {
         setReferralCode(profile.referral_code);
       }
     }
   }, [user, totalDays, profile]);
+
+  const fetchQuizScore = async () => {
+    if (!user) return;
+    try {
+      // Get all quiz submissions for this user
+      const { data: submissions } = await supabase
+        .from("quiz_submissions")
+        .select("score, max_score, material_id")
+        .eq("user_id", user.id);
+
+      if (!submissions || submissions.length === 0) {
+        setQuizScore({ total: 0, max: 0 });
+        return;
+      }
+
+      // Check which materials still exist (dynamic scoring)
+      const materialIds = [...new Set(submissions.map(s => s.material_id))];
+      const { data: existingMats } = await supabase
+        .from("course_materials")
+        .select("id")
+        .in("id", materialIds);
+
+      const existingIds = new Set(existingMats?.map(m => m.id) || []);
+      const active = submissions.filter(s => existingIds.has(s.material_id));
+
+      setQuizScore({
+        total: active.reduce((sum, s) => sum + s.score, 0),
+        max: active.reduce((sum, s) => sum + s.max_score, 0),
+      });
+    } catch (e) {
+      console.error("Error fetching quiz scores:", e);
+    }
+  };
 
   const fetchProgress = async () => {
     try {
@@ -114,7 +149,7 @@ export default function UserDashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Days Completed</CardDescription>
@@ -135,7 +170,17 @@ export default function UserDashboard() {
             <CardHeader className="pb-2">
               <CardDescription>Overall Progress</CardDescription>
               <CardTitle className="text-3xl">
-                {Math.round((dayProgress.filter((d) => d.isCompleted).length / totalDays) * 100)}%
+                {totalDays > 0 ? Math.round((dayProgress.filter((d) => d.isCompleted).length / totalDays) * 100) : 0}%
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Trophy className="h-3.5 w-3.5" /> Quiz Score
+              </CardDescription>
+              <CardTitle className="text-3xl">
+                {quizScore.max > 0 ? `${quizScore.total}/${quizScore.max}` : "-"}
               </CardTitle>
             </CardHeader>
           </Card>

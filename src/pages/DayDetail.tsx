@@ -160,6 +160,29 @@ export default function DayDetail() {
 
     setSelectedMaterial(material);
 
+    // For quiz-only materials (no material_url), open quiz directly
+    if (material.quiz_id && !material.material_url) {
+      const { data: quizData } = await supabase.from("quizzes").select("*").eq("id", material.quiz_id).single();
+      if (quizData) {
+        const questions = typeof quizData.questions === "string" ? JSON.parse(quizData.questions) : quizData.questions;
+        setCurrentQuiz({ ...quizData, questions } as Quiz);
+        setShowQuiz(true);
+      }
+      return;
+    }
+
+    // For form-only materials (no material_url), open form directly
+    if (material.form_id && !material.material_url) {
+      const { data: formData } = await supabase.from("custom_forms").select("*").eq("id", material.form_id).single();
+      if (formData) {
+        const fields = typeof formData.fields === "string" ? JSON.parse(formData.fields) : formData.fields;
+        setCurrentForm({ ...formData, fields } as CustomForm);
+        setShowForm(true);
+      }
+      return;
+    }
+
+    // For materials with URLs that also have form/quiz, load them for later
     if (material.form_id) {
       const { data: formData } = await supabase.from("custom_forms").select("*").eq("id", material.form_id).single();
       if (formData) {
@@ -209,7 +232,7 @@ export default function DayDetail() {
       });
       await supabase.from("user_progress").insert({ user_id: user.id, material_id: selectedMaterial.id });
       setCompletedMaterials(prev => new Set([...prev, selectedMaterial.id]));
-      closeAllDialogs();
+      // Don't close dialogs here - let QuizTaker show results first
     } catch (error) {
       console.error("Error submitting quiz:", error);
     }
@@ -319,7 +342,7 @@ export default function DayDetail() {
           </div>
         )}
 
-        {/* Material Viewer Dialog */}
+        {/* Material Viewer Dialog - only for materials with URLs */}
         {selectedMaterial && !showForm && !showQuiz && !showResponse && (
           <MaterialViewer
             material={selectedMaterial}
