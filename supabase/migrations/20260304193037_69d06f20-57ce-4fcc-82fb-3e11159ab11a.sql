@@ -1,0 +1,5 @@
+ALTER TABLE public.whitelist 
+ADD COLUMN full_name text DEFAULT NULL,
+ADD COLUMN place text DEFAULT NULL,
+ADD COLUMN gender text DEFAULT NULL,
+ADD COLUMN age integer DEFAULT NULL;
