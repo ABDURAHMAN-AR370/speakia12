@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,52 +26,62 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const resolveEmail = async (input: string): Promise<string | null> => {
-    if (input.includes("@")) return input.toLowerCase();
-    const cleaned = input.replace(/\s+/g, "").replace(/^\+/, "");
-    // Try generated email format first via whitelist (publicly accessible)
-    const generatedEmail = `${cleaned}@qurba.app`;
-    const { data } = await supabase.from("whitelist").select("email").eq("email", generatedEmail).maybeSingle();
-    if (data) return data.email;
-    // Try matching phone_number in whitelist
-    const { data: data2 } = await supabase.from("whitelist").select("email").eq("phone_number", cleaned).maybeSingle();
-    return data2?.email || null;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setShowForgot(false);
 
-    const email = await resolveEmail(identifier);
-    if (!email) {
-      toast({ title: "Account not found", description: "No account found with this User ID.", variant: "destructive" });
-      setLoading(false);
-      return;
-    }
+    try {
+      // Step 1: Call auto-register edge function to ensure user exists
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ identifier, password }),
+      });
 
-    // Check if password reset is enabled
-    const { data: whitelistData } = await supabase.from("whitelist").select("password_reset_enabled").eq("email", email).maybeSingle();
-    if (whitelistData?.password_reset_enabled) {
-      setResolvedEmail(email);
-      setResetMode(true);
-      setLoading(false);
-      return;
-    }
+      const data = await response.json();
 
-    const result = await signIn(email, password);
-    if (result.success) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const role = await getUserRole(user.id);
-        toast({ title: "Welcome back!" });
-        navigate(role === "admin" ? "/admin" : "/dashboard");
-      } else {
-        navigate("/dashboard");
+      if (!response.ok) {
+        if (data.error === "not_whitelisted") {
+          toast({ title: "Access denied", description: "Your ID is not authorized. Please contact the administrator.", variant: "destructive" });
+        } else {
+          toast({ title: "Login failed", description: data.error || "Please try again.", variant: "destructive" });
+        }
+        setLoading(false);
+        return;
       }
-    } else {
-      setShowForgot(true);
-      toast({ title: "Login failed", description: result.error || "Please check your credentials.", variant: "destructive" });
+
+      const email = data.email;
+
+      // Step 2: Check if password reset is enabled
+      const { data: whitelistData } = await supabase.from("whitelist").select("password_reset_enabled").eq("email", email).maybeSingle();
+      if (whitelistData?.password_reset_enabled) {
+        setResolvedEmail(email);
+        setResetMode(true);
+        setLoading(false);
+        return;
+      }
+
+      // Step 3: Sign in
+      const result = await signIn(email, password);
+      if (result.success) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const role = await getUserRole(user.id);
+          toast({ title: "Welcome!" });
+          navigate(role === "admin" ? "/admin" : "/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
+      } else {
+        setShowForgot(true);
+        toast({ title: "Login failed", description: "Incorrect password. Please try again.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Login failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     }
     setLoading(false);
   };
@@ -88,8 +98,7 @@ export default function Login() {
     }
 
     setResettingPassword(true);
-    // Use the already resolved email instead of re-resolving
-    const email = resolvedEmail || await resolveEmail(identifier);
+    const email = resolvedEmail;
     if (!email) {
       toast({ title: "Account not found", variant: "destructive" });
       setResettingPassword(false);
@@ -109,7 +118,6 @@ export default function Login() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to reset password");
 
-      // Now sign in with new password
       const result = await signIn(email, newPassword);
       if (result.success) {
         toast({ title: "Password updated and logged in!" });
@@ -133,7 +141,7 @@ export default function Login() {
 
   const handleForgotPassword = () => {
     window.open(
-      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(`Hi, I forgot my Qurba website password. My number: ${identifier}. Please reset my password.`)}`,
+      `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(`Hi, I forgot my Qurba website password. My ID: ${identifier}. Please reset my password.`)}`,
       "_blank"
     );
   };
@@ -201,7 +209,7 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="identifier">User ID</Label>
-                <Input id="identifier" type="tel" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required disabled={loading} />
+                <Input id="identifier" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required disabled={loading} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -225,11 +233,6 @@ export default function Login() {
                 </Button>
               </div>
             )}
-
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
-              <Link to="/signup" className="text-primary hover:underline font-medium">Sign Up</Link>
-            </div>
           </CardContent>
         </Card>
       </div>
