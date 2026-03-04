@@ -52,18 +52,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if auth user already exists
-    const { data: existingUserData } = await supabase.auth.admin.getUserByEmail(email);
-    const existingUser = existingUserData?.user;
-
-    if (existingUser) {
-      // User exists - just return so client can sign in normally
-      return new Response(JSON.stringify({ action: "sign_in", email }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // User doesn't exist - auto-create with provided password (should be default 123456)
+    // Try to create the user. If they already exist, just return sign_in.
     const { data: whitelistData } = await supabase.from("whitelist").select("batch_number").eq("email", email).maybeSingle();
     const batchNumber = whitelistData?.batch_number || 1;
 
@@ -74,13 +63,19 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
+      // User already exists - that's fine, let client sign in
+      if (authError.message.includes("already been registered")) {
+        return new Response(JSON.stringify({ action: "sign_in", email }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ error: authError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create profile
+    // New user created - create profile
     const whatsappNumber = email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "";
     await supabase.from("profiles").insert({
       user_id: authData.user.id,
