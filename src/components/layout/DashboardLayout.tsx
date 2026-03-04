@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   Image,
-  Share2
+  Share2,
+  KeyRound
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const userLinks = [
     { href: "/dashboard", label: "My Course", icon: LayoutDashboard },
+    { href: "/change-password", label: "Change Password", icon: KeyRound },
   ];
 
   const links = isAdmin ? adminLinks : userLinks;
