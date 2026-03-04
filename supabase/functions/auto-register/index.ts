@@ -26,35 +26,31 @@ Deno.serve(async (req) => {
 
     // Resolve identifier to email
     let email: string | null = null;
+    let whitelistRow: any = null;
     const cleaned = identifier.replace(/\s+/g, "").replace(/^\+/, "");
 
     if (identifier.includes("@")) {
-      // It's already an email - check whitelist
-      const { data } = await supabase.from("whitelist").select("email").eq("email", identifier.toLowerCase()).maybeSingle();
-      email = data?.email || null;
+      const { data } = await supabase.from("whitelist").select("*").eq("email", identifier.toLowerCase()).maybeSingle();
+      if (data) { email = data.email; whitelistRow = data; }
     } else {
-      // Phone number - try generated email format
       const generatedEmail = `${cleaned}@qurba.app`;
-      const { data } = await supabase.from("whitelist").select("email").eq("email", generatedEmail).maybeSingle();
+      const { data } = await supabase.from("whitelist").select("*").eq("email", generatedEmail).maybeSingle();
       if (data) {
-        email = data.email;
+        email = data.email; whitelistRow = data;
       } else {
-        // Try phone_number column
-        const { data: data2 } = await supabase.from("whitelist").select("email").eq("phone_number", cleaned).maybeSingle();
-        email = data2?.email || null;
+        const { data: data2 } = await supabase.from("whitelist").select("*").eq("phone_number", cleaned).maybeSingle();
+        if (data2) { email = data2.email; whitelistRow = data2; }
       }
     }
 
-    if (!email) {
+    if (!email || !whitelistRow) {
       return new Response(JSON.stringify({ error: "not_whitelisted" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Try to create the user. If they already exist, just return sign_in.
-    const { data: whitelistData } = await supabase.from("whitelist").select("batch_number").eq("email", email).maybeSingle();
-    const batchNumber = whitelistData?.batch_number || 1;
+    const batchNumber = whitelistRow.batch_number || 1;
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email,
@@ -63,7 +59,6 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
-      // User already exists - that's fine, let client sign in
       if (authError.message.includes("already been registered")) {
         return new Response(JSON.stringify({ action: "sign_in", email }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -75,14 +70,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // New user created - create profile
-    const whatsappNumber = email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "";
+    // New user created - create profile using whitelist data
+    const whatsappNumber = whitelistRow.phone_number || (email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "");
     await supabase.from("profiles").insert({
       user_id: authData.user.id,
       email: email,
-      full_name: whatsappNumber || email.split("@")[0],
-      gender: "not_specified",
-      place: "",
+      full_name: whitelistRow.full_name || whatsappNumber || email.split("@")[0],
+      gender: whitelistRow.gender || "not_specified",
+      place: whitelistRow.place || "",
       whatsapp_number: whatsappNumber,
       batch_number: batchNumber,
     });

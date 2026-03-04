@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,13 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown, Download } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
 
 interface WhitelistEntry {
-  id: string; email: string; phone_number: string | null; batch_number: number; created_at: string; password_reset_enabled: boolean;
+  id: string; email: string; phone_number: string | null; batch_number: number; created_at: string; password_reset_enabled: boolean; full_name: string | null; place: string | null; gender: string | null; age: number | null;
 }
 interface UserProfile {
   id: string; user_id: string; email: string; full_name: string; gender: string; place: string; whatsapp_number: string; batch_number: number; created_at: string; referred_by: string | null; signup_source: string | null;
@@ -33,6 +32,7 @@ export default function AdminUsers() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [completions, setCompletions] = useState<CompletionData[]>([]);
@@ -45,13 +45,20 @@ export default function AdminUsers() {
   const [editBatch, setEditBatch] = useState("1");
   const [editFullName, setEditFullName] = useState("");
   const [editPlace, setEditPlace] = useState("");
+  // Add single user fields
   const [newPhone, setNewPhone] = useState("");
   const [newBatch, setNewBatch] = useState("1");
-  const [bulkPhones, setBulkPhones] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPlace, setNewPlace] = useState("");
+  const [newGender, setNewGender] = useState("");
+  const [newAge, setNewAge] = useState("");
+  // Bulk import
   const [bulkBatch, setBulkBatch] = useState("1");
   const [adding, setAdding] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("batches");
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
 
   // Search and sort state
   const [whitelistSearch, setWhitelistSearch] = useState("");
@@ -145,24 +152,105 @@ export default function AdminUsers() {
     try {
       const cleanedPhone = newPhone.replace(/\s+/g, "").replace(/^\+/, "");
       const email = `${cleanedPhone}@qurba.app`;
-      const { error } = await supabase.from("whitelist").insert({ email, phone_number: cleanedPhone, batch_number: parseInt(newBatch), added_by: user?.id });
+      const { error } = await supabase.from("whitelist").insert({
+        email,
+        phone_number: cleanedPhone,
+        batch_number: parseInt(newBatch),
+        added_by: user?.id,
+        full_name: newName.trim() || null,
+        place: newPlace.trim() || null,
+        gender: newGender || null,
+        age: newAge ? parseInt(newAge) : null,
+      });
       if (error) throw error;
-      toast({ title: "Phone number added" }); setNewPhone(""); setNewBatch("1"); setShowAddDialog(false); fetchData();
+      toast({ title: "User added to whitelist" });
+      setNewPhone(""); setNewBatch("1"); setNewName(""); setNewPlace(""); setNewGender(""); setNewAge("");
+      setShowAddDialog(false); fetchData();
     } catch (error: unknown) {
       toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
     } finally { setAdding(false); }
   };
 
-  const handleBulkAdd = async () => {
-    const phones = bulkPhones.split(/[\n,;]/).map(p => p.replace(/\s+/g, "").replace(/^\+/, "")).filter(p => p.length >= 7);
-    if (phones.length === 0) { toast({ title: "No valid phone numbers", variant: "destructive" }); return; }
+  const downloadCsvTemplate = () => {
+    const header = "user_id,batch,name,place,gender,age";
+    const example1 = "91XXXXXXXXXX,1,John Doe,Mumbai,male,25";
+    const example2 = "someone@gmail.com,1,Jane Doe,Delhi,female,22";
+    const csv = [header, example1, example2].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "user_import_template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { toast({ title: "CSV file is empty or has no data rows", variant: "destructive" }); return; }
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+      const userIdIdx = headers.indexOf("user_id");
+      const batchIdx = headers.indexOf("batch");
+      const nameIdx = headers.indexOf("name");
+      const placeIdx = headers.indexOf("place");
+      const genderIdx = headers.indexOf("gender");
+      const ageIdx = headers.indexOf("age");
+
+      if (userIdIdx === -1) { toast({ title: "CSV must have a 'user_id' column", variant: "destructive" }); return; }
+
+      const rows: any[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map(c => c.trim());
+        const userId = cols[userIdIdx];
+        if (!userId) continue;
+        rows.push({
+          user_id: userId,
+          batch: batchIdx !== -1 ? cols[batchIdx] : "",
+          name: nameIdx !== -1 ? cols[nameIdx] : "",
+          place: placeIdx !== -1 ? cols[placeIdx] : "",
+          gender: genderIdx !== -1 ? cols[genderIdx] : "",
+          age: ageIdx !== -1 ? cols[ageIdx] : "",
+        });
+      }
+      setCsvData(rows);
+    };
+    reader.readAsText(file);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleBulkCsvImport = async () => {
+    if (csvData.length === 0) { toast({ title: "No data to import", variant: "destructive" }); return; }
     setAdding(true);
     try {
-      const { error } = await supabase.from("whitelist").insert(phones.map(phone => ({ email: `${phone}@qurba.app`, phone_number: phone, batch_number: parseInt(bulkBatch), added_by: user?.id })));
+      const defaultBatch = parseInt(bulkBatch);
+      const entries = csvData.map(row => {
+        const userId = row.user_id.replace(/\s+/g, "").replace(/^\+/, "");
+        const isEmail = userId.includes("@");
+        const email = isEmail ? userId.toLowerCase() : `${userId}@qurba.app`;
+        const phoneNumber = isEmail ? null : userId;
+        const batch = row.batch ? parseInt(row.batch) : defaultBatch;
+        return {
+          email,
+          phone_number: phoneNumber,
+          batch_number: isNaN(batch) ? defaultBatch : batch,
+          added_by: user?.id,
+          full_name: row.name || null,
+          place: row.place || null,
+          gender: row.gender || null,
+          age: row.age ? parseInt(row.age) : null,
+        };
+      });
+      const { error } = await supabase.from("whitelist").insert(entries);
       if (error) throw error;
-      toast({ title: `${phones.length} numbers added` }); setBulkPhones(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
+      toast({ title: `${entries.length} users imported successfully` });
+      setCsvData([]); setCsvFileName(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
     } catch (error: unknown) {
-      toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
+      toast({ title: "Failed to import", description: (error as { message?: string }).message, variant: "destructive" });
     } finally { setAdding(false); }
   };
 
@@ -209,12 +297,11 @@ export default function AdminUsers() {
 
   const selectedBatchStudents = activeUsers.filter(u => u.batch_number === selectedBatch);
 
-  // Filtered/sorted whitelist
   const filteredWhitelist = useMemo(() => {
     let list = whitelist.filter(e => {
       const q = whitelistSearch.toLowerCase();
       if (!q) return true;
-      return (e.phone_number || "").toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
+      return (e.phone_number || "").toLowerCase().includes(q) || e.email.toLowerCase().includes(q) || (e.full_name || "").toLowerCase().includes(q);
     });
     list.sort((a, b) => {
       if (whitelistSort === "batch") return a.batch_number - b.batch_number;
@@ -229,7 +316,6 @@ export default function AdminUsers() {
     return list;
   }, [whitelist, whitelistSearch, whitelistSort, users]);
 
-  // Filtered/sorted users
   const filteredUsers = useMemo(() => {
     let list = users.filter(u => {
       const q = userSearch.toLowerCase();
@@ -258,7 +344,7 @@ export default function AdminUsers() {
               <Upload className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Bulk Import</span>
             </Button>
             <Button size="sm" onClick={() => setShowAddDialog(true)} className="flex-1 sm:flex-none">
-              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add Number</span>
+              <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Add User</span>
             </Button>
           </div>
         </div>
@@ -292,15 +378,14 @@ export default function AdminUsers() {
           <TabsContent value="whitelist">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />Phone Number Whitelist</CardTitle>
-                <CardDescription>Only whitelisted numbers can register. Toggle 🔑 to enable password reset.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><UsersIcon className="h-5 w-5" />User Whitelist</CardTitle>
+                <CardDescription>Only whitelisted users can sign in. Toggle 🔑 to enable password reset.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Search & Sort */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search phone or email..." value={whitelistSearch} onChange={e => setWhitelistSearch(e.target.value)} className="pl-9" />
+                    <Input placeholder="Search phone, email, or name..." value={whitelistSearch} onChange={e => setWhitelistSearch(e.target.value)} className="pl-9" />
                   </div>
                   <Select value={whitelistSort} onValueChange={(v: "batch" | "date" | "status") => setWhitelistSort(v)}>
                     <SelectTrigger className="w-[140px]"><ArrowUpDown className="h-4 w-4 mr-1" /><SelectValue /></SelectTrigger>
@@ -321,6 +406,7 @@ export default function AdminUsers() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Phone / Email</TableHead>
+                          <TableHead className="hidden sm:table-cell">Name</TableHead>
                           <TableHead className="hidden sm:table-cell">Batch</TableHead>
                           <TableHead className="hidden sm:table-cell">Status</TableHead>
                           <TableHead className="text-center">🔑 Reset</TableHead>
@@ -333,6 +419,7 @@ export default function AdminUsers() {
                           return (
                             <TableRow key={entry.id}>
                               <TableCell className="font-medium text-sm">{entry.phone_number || entry.email}</TableCell>
+                              <TableCell className="hidden sm:table-cell text-sm">{entry.full_name || "-"}</TableCell>
                               <TableCell className="hidden sm:table-cell"><Badge variant="outline">Batch {entry.batch_number}</Badge></TableCell>
                               <TableCell className="hidden sm:table-cell"><Badge variant={isRegistered ? "default" : "secondary"}>{isRegistered ? "Registered" : "Pending"}</Badge></TableCell>
                               <TableCell className="text-center">
@@ -359,7 +446,6 @@ export default function AdminUsers() {
                 <CardDescription>View and edit user details. Click name to see full profile.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Search & Sort */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -411,38 +497,88 @@ export default function AdminUsers() {
           </TabsContent>
         </Tabs>
 
-        {/* Add Single Phone Dialog */}
+        {/* Add Single User Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add Phone Number to Whitelist</DialogTitle><DialogDescription>This number will be able to register</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Add User to Whitelist</DialogTitle><DialogDescription>WhatsApp number will be used as User ID. Name, Place, Gender, Age are optional.</DialogDescription></DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2"><Label>WhatsApp Number</Label><Input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} /></div>
+              <div className="space-y-2"><Label>WhatsApp Number *</Label><Input type="tel" placeholder="91XXXXXXXXXX" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} /></div>
               <div className="space-y-2">
-                <Label>Batch Number</Label>
+                <Label>Batch Number *</Label>
                 <Select value={newBatch} onValueChange={setNewBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
+              </div>
+              <div className="space-y-2"><Label>Name</Label><Input placeholder="Full name" value={newName} onChange={(e) => setNewName(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Place</Label><Input placeholder="City / Town" value={newPlace} onChange={(e) => setNewPlace(e.target.value)} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <Select value={newGender} onValueChange={setNewGender}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>Age</Label><Input type="number" placeholder="Age" value={newAge} onChange={(e) => setNewAge(e.target.value)} /></div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddPhone} disabled={adding}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Number</Button>
+              <Button onClick={handleAddPhone} disabled={adding || !newPhone.trim()}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add User</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Bulk Import Dialog */}
-        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Bulk Import Phone Numbers</DialogTitle><DialogDescription>Paste multiple numbers separated by commas, semicolons, or new lines</DialogDescription></DialogHeader>
+        <Dialog open={showBulkDialog} onOpenChange={(open) => { setShowBulkDialog(open); if (!open) { setCsvData([]); setCsvFileName(""); } }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Bulk Import Users</DialogTitle><DialogDescription>Download the CSV template, fill it in, and upload to import users in bulk.</DialogDescription></DialogHeader>
             <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={downloadCsvTemplate}>
+                  <Download className="h-4 w-4 mr-2" />Download Template
+                </Button>
+                <span className="text-xs text-muted-foreground">CSV with columns: user_id, batch, name, place, gender, age</span>
+              </div>
               <div className="space-y-2">
-                <Label>Batch Number</Label>
+                <Label>Default Batch (used if batch column is empty)</Label>
                 <Select value={bulkBatch} onValueChange={setBulkBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="space-y-2"><Label>Phone Numbers</Label><Textarea placeholder={"91XXXXXXXXXX\n91XXXXXXXXXX"} value={bulkPhones} onChange={(e) => setBulkPhones(e.target.value)} rows={6} /></div>
+              <div className="space-y-2">
+                <Label>Upload CSV File</Label>
+                <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvUpload} />
+              </div>
+              {csvData.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{csvFileName}: {csvData.length} users found</p>
+                  <div className="max-h-40 overflow-auto border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">User ID</TableHead>
+                          <TableHead className="text-xs">Batch</TableHead>
+                          <TableHead className="text-xs">Name</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {csvData.slice(0, 10).map((row, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs py-1">{row.user_id}</TableCell>
+                            <TableCell className="text-xs py-1">{row.batch || bulkBatch}</TableCell>
+                            <TableCell className="text-xs py-1">{row.name || "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                        {csvData.length > 10 && <TableRow><TableCell colSpan={3} className="text-xs text-center text-muted-foreground py-1">...and {csvData.length - 10} more</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
-              <Button onClick={handleBulkAdd} disabled={adding}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import Numbers</Button>
+              <Button variant="outline" onClick={() => { setShowBulkDialog(false); setCsvData([]); setCsvFileName(""); }}>Cancel</Button>
+              <Button onClick={handleBulkCsvImport} disabled={adding || csvData.length === 0}>{adding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Import {csvData.length} Users</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

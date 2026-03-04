@@ -433,30 +433,42 @@ export type Database = {
       whitelist: {
         Row: {
           added_by: string | null
+          age: number | null
           batch_number: number
           created_at: string
           email: string
+          full_name: string | null
+          gender: string | null
           id: string
           password_reset_enabled: boolean
           phone_number: string | null
+          place: string | null
         }
         Insert: {
           added_by?: string | null
+          age?: number | null
           batch_number?: number
           created_at?: string
           email: string
+          full_name?: string | null
+          gender?: string | null
           id?: string
           password_reset_enabled?: boolean
           phone_number?: string | null
+          place?: string | null
         }
         Update: {
           added_by?: string | null
+          age?: number | null
           batch_number?: number
           created_at?: string
           email?: string
+          full_name?: string | null
+          gender?: string | null
           id?: string
           password_reset_enabled?: boolean
           phone_number?: string | null
+          place?: string | null
         }
         Relationships: []
       }
