@@ -443,6 +443,8 @@ export type Database = {
           password_reset_enabled: boolean
           phone_number: string | null
           place: string | null
+          referred_by: string | null
+          signup_source: string | null
         }
         Insert: {
           added_by?: string | null
@@ -456,6 +458,8 @@ export type Database = {
           password_reset_enabled?: boolean
           phone_number?: string | null
           place?: string | null
+          referred_by?: string | null
+          signup_source?: string | null
         }
         Update: {
           added_by?: string | null
@@ -469,6 +473,8 @@ export type Database = {
           password_reset_enabled?: boolean
           phone_number?: string | null
           place?: string | null
+          referred_by?: string | null
+          signup_source?: string | null
         }
         Relationships: []
       }

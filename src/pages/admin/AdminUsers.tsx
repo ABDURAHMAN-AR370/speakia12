@@ -52,6 +52,8 @@ export default function AdminUsers() {
   const [newPlace, setNewPlace] = useState("");
   const [newGender, setNewGender] = useState("");
   const [newAge, setNewAge] = useState("");
+  const [newReferrer, setNewReferrer] = useState("");
+  const [newSource, setNewSource] = useState("");
   // Bulk import
   const [bulkBatch, setBulkBatch] = useState("1");
   const [adding, setAdding] = useState(false);
@@ -161,10 +163,12 @@ export default function AdminUsers() {
         place: newPlace.trim() || null,
         gender: newGender || null,
         age: newAge ? parseInt(newAge) : null,
-      });
+        referred_by: newReferrer.trim() || null,
+        signup_source: newSource.trim() || null,
+      } as any);
       if (error) throw error;
       toast({ title: "User added to whitelist" });
-      setNewPhone(""); setNewBatch("1"); setNewName(""); setNewPlace(""); setNewGender(""); setNewAge("");
+      setNewPhone(""); setNewBatch("1"); setNewName(""); setNewPlace(""); setNewGender(""); setNewAge(""); setNewReferrer(""); setNewSource("");
       setShowAddDialog(false); fetchData();
     } catch (error: unknown) {
       toast({ title: "Failed to add", description: (error as { message?: string }).message, variant: "destructive" });
@@ -172,9 +176,9 @@ export default function AdminUsers() {
   };
 
   const downloadCsvTemplate = () => {
-    const header = "user_id,batch,name,place,gender,age";
-    const example1 = "91XXXXXXXXXX,1,John Doe,Mumbai,male,25";
-    const example2 = "someone@gmail.com,1,Jane Doe,Delhi,female,22";
+    const header = "user_id,batch,name,place,gender,age,referrer,source";
+    const example1 = "91XXXXXXXXXX,1,John Doe,Mumbai,male,25,REF123,whatsapp";
+    const example2 = "someone@gmail.com,1,Jane Doe,Delhi,female,22,,instagram";
     const csv = [header, example1, example2].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -199,6 +203,8 @@ export default function AdminUsers() {
       const placeIdx = headers.indexOf("place");
       const genderIdx = headers.indexOf("gender");
       const ageIdx = headers.indexOf("age");
+      const referrerIdx = headers.indexOf("referrer");
+      const sourceIdx = headers.indexOf("source");
 
       if (userIdIdx === -1) { toast({ title: "CSV must have a 'user_id' column", variant: "destructive" }); return; }
 
@@ -214,12 +220,13 @@ export default function AdminUsers() {
           place: placeIdx !== -1 ? cols[placeIdx] : "",
           gender: genderIdx !== -1 ? cols[genderIdx] : "",
           age: ageIdx !== -1 ? cols[ageIdx] : "",
+          referrer: referrerIdx !== -1 ? cols[referrerIdx] : "",
+          source: sourceIdx !== -1 ? cols[sourceIdx] : "",
         });
       }
       setCsvData(rows);
     };
     reader.readAsText(file);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -243,10 +250,56 @@ export default function AdminUsers() {
           place: row.place || null,
           gender: row.gender || null,
           age: row.age ? parseInt(row.age) : null,
+          referred_by: row.referrer || null,
+          signup_source: row.source || null,
         };
       });
-      const { error } = await supabase.from("whitelist").insert(entries);
+      const { error } = await supabase.from("whitelist").insert(entries as any);
       if (error) throw error;
+
+      // Sync profile-like data: for each imported user that already has a profile, update it
+      // For referrer/source, we store them when the user registers via the edge function
+      // Store referrer/source info per email for the edge function to use
+      const referrerSourceMap = csvData.reduce((acc: any[], row) => {
+        if (row.referrer || row.source) {
+          const userId = row.user_id.replace(/\s+/g, "").replace(/^\+/, "");
+          const isEmail = userId.includes("@");
+          const email = isEmail ? userId.toLowerCase() : `${userId}@qurba.app`;
+          acc.push({ email, referrer: row.referrer || null, source: row.source || null });
+        }
+        return acc;
+      }, []);
+
+      // Update existing profiles if they exist
+      for (const item of referrerSourceMap) {
+        const existingProfile = users.find(u => u.email === item.email);
+        if (existingProfile) {
+          const updates: any = {};
+          if (item.referrer) updates.referred_by = item.referrer;
+          if (item.source) updates.signup_source = item.source;
+          if (Object.keys(updates).length > 0) {
+            await supabase.from("profiles").update(updates).eq("email", item.email);
+          }
+        }
+      }
+
+      // Also update names for existing profiles from CSV data
+      for (const row of csvData) {
+        const userId = row.user_id.replace(/\s+/g, "").replace(/^\+/, "");
+        const isEmail = userId.includes("@");
+        const email = isEmail ? userId.toLowerCase() : `${userId}@qurba.app`;
+        const existingProfile = users.find(u => u.email === email);
+        if (existingProfile) {
+          const updates: any = {};
+          if (row.name) updates.full_name = row.name;
+          if (row.place) updates.place = row.place;
+          if (row.gender) updates.gender = row.gender;
+          if (Object.keys(updates).length > 0) {
+            await supabase.from("profiles").update(updates).eq("email", email);
+          }
+        }
+      }
+
       toast({ title: `${entries.length} users imported successfully` });
       setCsvData([]); setCsvFileName(""); setBulkBatch("1"); setShowBulkDialog(false); fetchData();
     } catch (error: unknown) {
@@ -500,14 +553,14 @@ export default function AdminUsers() {
         {/* Add Single User Dialog */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add User to Whitelist</DialogTitle><DialogDescription>WhatsApp number will be used as User ID. Name, Place, Gender, Age are optional.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Add User to Whitelist</DialogTitle><DialogDescription>WhatsApp number will be used as User ID. All fields except WhatsApp and Batch are optional.</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2"><Label>WhatsApp Number *</Label><Input type="tel" placeholder="91XXXXXXXXXX" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} /></div>
               <div className="space-y-2">
                 <Label>Batch Number *</Label>
                 <Select value={newBatch} onValueChange={setNewBatch}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 20 }, (_, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>Batch {i + 1}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="space-y-2"><Label>Name</Label><Input placeholder="Full name" value={newName} onChange={(e) => setNewName(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Name</Label><Input placeholder="Full name (defaults to 'Student')" value={newName} onChange={(e) => setNewName(e.target.value)} /></div>
               <div className="space-y-2"><Label>Place</Label><Input placeholder="City / Town" value={newPlace} onChange={(e) => setNewPlace(e.target.value)} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -521,6 +574,10 @@ export default function AdminUsers() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>Age</Label><Input type="number" placeholder="Age" value={newAge} onChange={(e) => setNewAge(e.target.value)} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Referrer</Label><Input placeholder="Referral code" value={newReferrer} onChange={(e) => setNewReferrer(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Source</Label><Input placeholder="e.g. whatsapp, instagram" value={newSource} onChange={(e) => setNewSource(e.target.value)} /></div>
               </div>
             </div>
             <DialogFooter>
@@ -539,7 +596,7 @@ export default function AdminUsers() {
                 <Button variant="outline" size="sm" onClick={downloadCsvTemplate}>
                   <Download className="h-4 w-4 mr-2" />Download Template
                 </Button>
-                <span className="text-xs text-muted-foreground">CSV with columns: user_id, batch, name, place, gender, age</span>
+                <span className="text-xs text-muted-foreground">Columns: user_id, batch, name, place, gender, age, referrer, source</span>
               </div>
               <div className="space-y-2">
                 <Label>Default Batch (used if batch column is empty)</Label>
@@ -559,6 +616,7 @@ export default function AdminUsers() {
                           <TableHead className="text-xs">User ID</TableHead>
                           <TableHead className="text-xs">Batch</TableHead>
                           <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs">Source</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -567,9 +625,10 @@ export default function AdminUsers() {
                             <TableCell className="text-xs py-1">{row.user_id}</TableCell>
                             <TableCell className="text-xs py-1">{row.batch || bulkBatch}</TableCell>
                             <TableCell className="text-xs py-1">{row.name || "-"}</TableCell>
+                            <TableCell className="text-xs py-1">{row.source || "-"}</TableCell>
                           </TableRow>
                         ))}
-                        {csvData.length > 10 && <TableRow><TableCell colSpan={3} className="text-xs text-center text-muted-foreground py-1">...and {csvData.length - 10} more</TableCell></TableRow>}
+                        {csvData.length > 10 && <TableRow><TableCell colSpan={4} className="text-xs text-center text-muted-foreground py-1">...and {csvData.length - 10} more</TableCell></TableRow>}
                       </TableBody>
                     </Table>
                   </div>
