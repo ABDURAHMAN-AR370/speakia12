@@ -72,14 +72,20 @@ Deno.serve(async (req) => {
 
     // New user created - create profile using whitelist data
     const whatsappNumber = whitelistRow.phone_number || (email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "");
+    
+    // Default name to "Student" if not provided
+    const fullName = whitelistRow.full_name || "Student";
+
     await supabase.from("profiles").insert({
       user_id: authData.user.id,
       email: email,
-      full_name: whitelistRow.full_name || whatsappNumber || email.split("@")[0],
+      full_name: fullName,
       gender: whitelistRow.gender || "not_specified",
       place: whitelistRow.place || "",
       whatsapp_number: whatsappNumber,
       batch_number: batchNumber,
+      referred_by: whitelistRow.referred_by || null,
+      signup_source: whitelistRow.signup_source || null,
     });
 
     return new Response(JSON.stringify({ action: "created", email }), {
