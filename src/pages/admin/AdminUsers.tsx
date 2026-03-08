@@ -246,54 +246,32 @@ export default function AdminUsers() {
           phone_number: phoneNumber,
           batch_number: isNaN(batch) ? defaultBatch : batch,
           added_by: user?.id,
-          full_name: row.name || null,
-          place: row.place || null,
-          gender: row.gender || null,
+          full_name: row.name?.trim() || null,
+          place: row.place?.trim() || null,
+          gender: row.gender?.trim() || null,
           age: row.age ? parseInt(row.age) : null,
-          referred_by: row.referrer || null,
-          signup_source: row.source || null,
+          referred_by: row.referrer?.trim() || null,
+          signup_source: row.source?.trim() || null,
         };
       });
       const { error } = await supabase.from("whitelist").insert(entries as any);
       if (error) throw error;
 
-      // Sync profile-like data: for each imported user that already has a profile, update it
-      // For referrer/source, we store them when the user registers via the edge function
-      // Store referrer/source info per email for the edge function to use
-      const referrerSourceMap = csvData.reduce((acc: any[], row) => {
-        if (row.referrer || row.source) {
-          const userId = row.user_id.replace(/\s+/g, "").replace(/^\+/, "");
-          const isEmail = userId.includes("@");
-          const email = isEmail ? userId.toLowerCase() : `${userId}@qurba.app`;
-          acc.push({ email, referrer: row.referrer || null, source: row.source || null });
-        }
-        return acc;
-      }, []);
-
-      // Update existing profiles if they exist
-      for (const item of referrerSourceMap) {
-        const existingProfile = users.find(u => u.email === item.email);
-        if (existingProfile) {
-          const updates: any = {};
-          if (item.referrer) updates.referred_by = item.referrer;
-          if (item.source) updates.signup_source = item.source;
-          if (Object.keys(updates).length > 0) {
-            await supabase.from("profiles").update(updates).eq("email", item.email);
-          }
-        }
-      }
-
-      // Also update names for existing profiles from CSV data
+      // Sync ALL fields to existing profiles
       for (const row of csvData) {
         const userId = row.user_id.replace(/\s+/g, "").replace(/^\+/, "");
         const isEmail = userId.includes("@");
         const email = isEmail ? userId.toLowerCase() : `${userId}@qurba.app`;
         const existingProfile = users.find(u => u.email === email);
         if (existingProfile) {
-          const updates: any = {};
-          if (row.name) updates.full_name = row.name;
-          if (row.place) updates.place = row.place;
-          if (row.gender) updates.gender = row.gender;
+          const updates: Record<string, any> = {};
+          if (row.name?.trim()) updates.full_name = row.name.trim();
+          if (row.place?.trim()) updates.place = row.place.trim();
+          if (row.gender?.trim()) updates.gender = row.gender.trim();
+          if (row.referrer?.trim()) updates.referred_by = row.referrer.trim();
+          if (row.source?.trim()) updates.signup_source = row.source.trim();
+          const batch = row.batch ? parseInt(row.batch) : defaultBatch;
+          if (!isNaN(batch)) updates.batch_number = batch;
           if (Object.keys(updates).length > 0) {
             await supabase.from("profiles").update(updates).eq("email", email);
           }

@@ -252,7 +252,9 @@ export default function StudentDetail() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                <div><span className="text-muted-foreground">WhatsApp:</span><p className="font-medium">{profile.whatsapp_number}</p></div>
+                <div><span className="text-muted-foreground">Email:</span><p className="font-medium">{profile.email}</p></div>
+                <div><span className="text-muted-foreground">WhatsApp:</span><p className="font-medium">{profile.whatsapp_number || "-"}</p></div>
+                <div><span className="text-muted-foreground">Gender:</span><p className="font-medium capitalize">{profile.gender && profile.gender !== "not_specified" ? profile.gender : "-"}</p></div>
                 <div><span className="text-muted-foreground">Place:</span><p className="font-medium">{profile.place || "-"}</p></div>
                 <div><span className="text-muted-foreground">Source:</span><p className="font-medium">{profile.signup_source || "-"}</p></div>
                 <div><span className="text-muted-foreground">Referred By:</span><p className="font-medium">{profile.referred_by || "-"}</p></div>
