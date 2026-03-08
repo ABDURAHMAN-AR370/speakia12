@@ -246,12 +246,12 @@ export default function AdminUsers() {
           phone_number: phoneNumber,
           batch_number: isNaN(batch) ? defaultBatch : batch,
           added_by: user?.id,
-          full_name: row.name || null,
-          place: row.place || null,
-          gender: row.gender || null,
+          full_name: row.name?.trim() || null,
+          place: row.place?.trim() || null,
+          gender: row.gender?.trim() || null,
           age: row.age ? parseInt(row.age) : null,
-          referred_by: row.referrer || null,
-          signup_source: row.source || null,
+          referred_by: row.referrer?.trim() || null,
+          signup_source: row.source?.trim() || null,
         };
       });
       const { error } = await supabase.from("whitelist").insert(entries as any);

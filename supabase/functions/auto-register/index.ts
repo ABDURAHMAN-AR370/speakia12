@@ -51,6 +51,12 @@ Deno.serve(async (req) => {
     }
 
     const batchNumber = whitelistRow.batch_number || 1;
+    const fullName = whitelistRow.full_name || "Student";
+    const whatsappNumber = whitelistRow.phone_number || (email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "");
+    const gender = whitelistRow.gender || "not_specified";
+    const place = whitelistRow.place || "";
+    const referredBy = whitelistRow.referred_by || null;
+    const signupSource = whitelistRow.signup_source || null;
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email,
@@ -60,6 +66,49 @@ Deno.serve(async (req) => {
 
     if (authError) {
       if (authError.message.includes("already been registered")) {
+        // User exists — sync profile data from whitelist on every sign-in
+        // Find the user's auth record to get user_id
+        const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
+        const existingUser = authUsers?.find((u: any) => u.email === email);
+        
+        if (existingUser) {
+          // Check if profile exists
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("user_id", existingUser.id)
+            .maybeSingle();
+
+          if (existingProfile) {
+            // Update profile with whitelist data (whitelist is source of truth for admin-set fields)
+            const updates: any = {
+              batch_number: batchNumber,
+            };
+            // Only update name if whitelist has a name (don't overwrite with "Student" if profile already has a real name)
+            if (whitelistRow.full_name) updates.full_name = whitelistRow.full_name;
+            if (whitelistRow.place) updates.place = whitelistRow.place;
+            if (whitelistRow.gender) updates.gender = whitelistRow.gender;
+            if (whitelistRow.phone_number) updates.whatsapp_number = whitelistRow.phone_number;
+            if (whitelistRow.referred_by) updates.referred_by = whitelistRow.referred_by;
+            if (whitelistRow.signup_source) updates.signup_source = whitelistRow.signup_source;
+
+            await supabase.from("profiles").update(updates).eq("user_id", existingUser.id);
+          } else {
+            // Profile doesn't exist yet — create it
+            await supabase.from("profiles").insert({
+              user_id: existingUser.id,
+              email: email,
+              full_name: fullName,
+              gender: gender,
+              place: place,
+              whatsapp_number: whatsappNumber,
+              batch_number: batchNumber,
+              referred_by: referredBy,
+              signup_source: signupSource,
+            });
+          }
+        }
+
         return new Response(JSON.stringify({ action: "sign_in", email }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -71,21 +120,16 @@ Deno.serve(async (req) => {
     }
 
     // New user created - create profile using whitelist data
-    const whatsappNumber = whitelistRow.phone_number || (email.endsWith("@qurba.app") ? email.replace("@qurba.app", "") : "");
-    
-    // Default name to "Student" if not provided
-    const fullName = whitelistRow.full_name || "Student";
-
     await supabase.from("profiles").insert({
       user_id: authData.user.id,
       email: email,
       full_name: fullName,
-      gender: whitelistRow.gender || "not_specified",
-      place: whitelistRow.place || "",
+      gender: gender,
+      place: place,
       whatsapp_number: whatsappNumber,
       batch_number: batchNumber,
-      referred_by: whitelistRow.referred_by || null,
-      signup_source: whitelistRow.signup_source || null,
+      referred_by: referredBy,
+      signup_source: signupSource,
     });
 
     return new Response(JSON.stringify({ action: "created", email }), {
