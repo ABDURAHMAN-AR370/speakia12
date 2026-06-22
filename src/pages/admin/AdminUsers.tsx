@@ -683,6 +683,30 @@ export default function AdminUsers() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Admin Change Password Dialog */}
+        <Dialog open={showPwdDialog} onOpenChange={setShowPwdDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change User Password</DialogTitle>
+              <DialogDescription>
+                Set a new password for <span className="font-medium">{pwdUser?.full_name}</span> ({pwdUser?.whatsapp_number || pwdUser?.email}). They will be able to sign in immediately with this new password.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input type="text" placeholder="Enter new password" value={adminNewPwd} onChange={(e) => setAdminNewPwd(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPwdDialog(false)} disabled={pwdSaving}>Cancel</Button>
+              <Button onClick={handleAdminChangePassword} disabled={pwdSaving || !adminNewPwd.trim()}>
+                {pwdSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}Set Password
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
