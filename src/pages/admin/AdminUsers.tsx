@@ -310,6 +310,36 @@ export default function AdminUsers() {
     setEditingUser(userProfile); setEditBatch(userProfile.batch_number.toString()); setEditFullName(userProfile.full_name); setEditPlace(userProfile.place); setShowEditDialog(true);
   };
 
+  const openChangePassword = (u: UserProfile) => {
+    setPwdUser(u); setAdminNewPwd(""); setShowPwdDialog(true);
+  };
+
+  const handleAdminChangePassword = async () => {
+    if (!pwdUser || !adminNewPwd.trim()) {
+      toast({ title: "Password cannot be empty", variant: "destructive" });
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ email: pwdUser.email, new_password: adminNewPwd }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+      toast({ title: "Password updated", description: `${pwdUser.full_name} can now sign in with the new password.` });
+      setShowPwdDialog(false); setPwdUser(null); setAdminNewPwd("");
+    } catch (error: unknown) {
+      toast({ title: "Failed to change password", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   const handleSaveEdit = async () => {
     if (!editingUser) return;
     try {
