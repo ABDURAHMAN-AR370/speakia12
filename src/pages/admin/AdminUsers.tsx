@@ -538,7 +538,7 @@ export default function AdminUsers() {
                           <TableHead className="hidden sm:table-cell">Place</TableHead>
                           <TableHead>Batch</TableHead>
                           <TableHead className="hidden sm:table-cell">Source</TableHead>
-                          <TableHead className="w-[60px]">Edit</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -549,8 +549,11 @@ export default function AdminUsers() {
                             <TableCell className="hidden sm:table-cell text-sm">{u.place || "-"}</TableCell>
                             <TableCell><Badge variant="outline">Batch {u.batch_number}</Badge></TableCell>
                             <TableCell className="hidden sm:table-cell text-sm">{u.signup_source || "-"}</TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" onClick={() => openEditUser(u)}><Pencil className="h-4 w-4" /></Button>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" title="Change password" onClick={() => openChangePassword(u)}><KeyRound className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" title="Edit user" onClick={() => openEditUser(u)}><Pencil className="h-4 w-4" /></Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
