@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown, Download } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown, Download, KeyRound } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
@@ -61,6 +61,11 @@ export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState("batches");
   const [csvData, setCsvData] = useState<any[]>([]);
   const [csvFileName, setCsvFileName] = useState("");
+  // Admin password change
+  const [showPwdDialog, setShowPwdDialog] = useState(false);
+  const [pwdUser, setPwdUser] = useState<UserProfile | null>(null);
+  const [adminNewPwd, setAdminNewPwd] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   // Search and sort state
   const [whitelistSearch, setWhitelistSearch] = useState("");
@@ -305,6 +310,36 @@ export default function AdminUsers() {
     setEditingUser(userProfile); setEditBatch(userProfile.batch_number.toString()); setEditFullName(userProfile.full_name); setEditPlace(userProfile.place); setShowEditDialog(true);
   };
 
+  const openChangePassword = (u: UserProfile) => {
+    setPwdUser(u); setAdminNewPwd(""); setShowPwdDialog(true);
+  };
+
+  const handleAdminChangePassword = async () => {
+    if (!pwdUser || !adminNewPwd.trim()) {
+      toast({ title: "Password cannot be empty", variant: "destructive" });
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ email: pwdUser.email, new_password: adminNewPwd }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+      toast({ title: "Password updated", description: `${pwdUser.full_name} can now sign in with the new password.` });
+      setShowPwdDialog(false); setPwdUser(null); setAdminNewPwd("");
+    } catch (error: unknown) {
+      toast({ title: "Failed to change password", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   const handleSaveEdit = async () => {
     if (!editingUser) return;
     try {
@@ -503,7 +538,7 @@ export default function AdminUsers() {
                           <TableHead className="hidden sm:table-cell">Place</TableHead>
                           <TableHead>Batch</TableHead>
                           <TableHead className="hidden sm:table-cell">Source</TableHead>
-                          <TableHead className="w-[60px]">Edit</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -514,8 +549,11 @@ export default function AdminUsers() {
                             <TableCell className="hidden sm:table-cell text-sm">{u.place || "-"}</TableCell>
                             <TableCell><Badge variant="outline">Batch {u.batch_number}</Badge></TableCell>
                             <TableCell className="hidden sm:table-cell text-sm">{u.signup_source || "-"}</TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" onClick={() => openEditUser(u)}><Pencil className="h-4 w-4" /></Button>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" title="Change password" onClick={() => openChangePassword(u)}><KeyRound className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" title="Edit user" onClick={() => openEditUser(u)}><Pencil className="h-4 w-4" /></Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -642,6 +680,30 @@ export default function AdminUsers() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
               <Button onClick={handleSaveEdit}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Admin Change Password Dialog */}
+        <Dialog open={showPwdDialog} onOpenChange={setShowPwdDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change User Password</DialogTitle>
+              <DialogDescription>
+                Set a new password for <span className="font-medium">{pwdUser?.full_name}</span> ({pwdUser?.whatsapp_number || pwdUser?.email}). They will be able to sign in immediately with this new password.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input type="text" placeholder="Enter new password" value={adminNewPwd} onChange={(e) => setAdminNewPwd(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPwdDialog(false)} disabled={pwdSaving}>Cancel</Button>
+              <Button onClick={handleAdminChangePassword} disabled={pwdSaving || !adminNewPwd.trim()}>
+                {pwdSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}Set Password
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
