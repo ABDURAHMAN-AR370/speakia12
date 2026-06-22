@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown, Download } from "lucide-react";
+import { Plus, Trash2, Upload, Users as UsersIcon, Loader2, Pencil, Search, ArrowUpDown, Download, KeyRound } from "lucide-react";
 import BatchCards from "@/components/admin/BatchCards";
 import AttendanceRegister from "@/components/admin/AttendanceRegister";
 import ToppersLeaderboard from "@/components/admin/ToppersLeaderboard";
