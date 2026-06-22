@@ -61,6 +61,11 @@ export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState("batches");
   const [csvData, setCsvData] = useState<any[]>([]);
   const [csvFileName, setCsvFileName] = useState("");
+  // Admin password change
+  const [showPwdDialog, setShowPwdDialog] = useState(false);
+  const [pwdUser, setPwdUser] = useState<UserProfile | null>(null);
+  const [adminNewPwd, setAdminNewPwd] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   // Search and sort state
   const [whitelistSearch, setWhitelistSearch] = useState("");
